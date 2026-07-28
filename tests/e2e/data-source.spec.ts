@@ -23,9 +23,24 @@ test('E2E-24: slow response shows loading, never flashes fallback (UC-28)', asyn
   });
   await page.goto('/?family=alpha');
   await expect(page.getByTestId('loading')).toBeVisible();
-  await expect(page.getByTestId('sample-banner')).toHaveCount(0); // still loading — no fallback flash yet
+
+  // Continuously watch for the fallback banner across the whole delay window — not just at two
+  // instants — so a future timing-based intermediate state (not just today's atomic setState)
+  // would also be caught.
+  let sawBanner = false;
+  let done = false;
+  const watcher = (async () => {
+    while (!done) {
+      if (await page.getByTestId('sample-banner').count()) sawBanner = true;
+      await page.waitForTimeout(100);
+    }
+  })();
+
   await expect(page.locator('.person-card').first()).toBeVisible({ timeout: 5000 });
-  await expect(page.getByTestId('sample-banner')).toHaveCount(0); // live data arrived — never showed fallback
+  done = true;
+  await watcher;
+  expect(sawBanner).toBe(false); // never flashed the fallback while live data was in flight
+  await expect(page.getByTestId('sample-banner')).toHaveCount(0); // final state: no banner, live data arrived
 });
 
 test('E2E-25: HTML response → demo + couldn\'t-read banner, no crash (UC-29)', async ({ page }) => {
