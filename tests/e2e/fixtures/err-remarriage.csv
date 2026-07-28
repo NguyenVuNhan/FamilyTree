@@ -1,0 +1,4 @@
+ID,FullName,Image,PartnerID,ParentIDs
+anna,Anna,,,
+bob,Bob,,anna,
+carl,Carl,,anna,

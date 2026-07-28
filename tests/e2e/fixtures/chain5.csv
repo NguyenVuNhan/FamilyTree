@@ -1,0 +1,6 @@
+ID,FullName,Image,PartnerID,ParentIDs
+g1,Gen One,,,
+g2,Gen Two,,,g1
+g3,Gen Three,,,g2
+g4,Gen Four,,,g3
+g5,Gen Five,,,g4
