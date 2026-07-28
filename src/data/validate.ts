@@ -23,6 +23,9 @@ export function validateRows(rows: PersonRow[]): ValidationResult {
     }
     if (!row.fullName) errors.push({ row: row.rowNumber, message: `Row ${row.rowNumber} is missing FullName` });
     if (!row.id) errors.push({ row: row.rowNumber, message: `Row ${row.rowNumber} is missing ID` });
+    if (row.partnerId && row.id && row.partnerId === row.id) {
+      errors.push({ row: row.rowNumber, message: `row ${row.rowNumber}: "${row.id}" lists themselves as partner` });
+    }
   }
 
   // case-only id collisions

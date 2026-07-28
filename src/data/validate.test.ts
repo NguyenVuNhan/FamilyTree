@@ -53,6 +53,11 @@ emma,Emma Ellis,,,david;sarah`);
     expect(err?.message).toMatch(/bob.*row 3.*carl.*row 4/s);
   });
 
+  it('self-partner: PartnerID === own ID', () => {
+    const r = v(`${H}\na,Ann,,a,`);
+    expect(r.errors.some((e) => e.message.includes('"a"') && e.message.includes('lists themselves as partner') && e.row === 2)).toBe(true);
+  });
+
   it('ancestry cycle', () => {
     const r = v(`${H}\na,Ann,,,b\nb,Bob,,,a`);
     expect(r.errors.some((e) => e.message.toLowerCase().includes('cycle'))).toBe(true);

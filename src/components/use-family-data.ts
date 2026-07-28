@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Family } from '../config/families';
+import { DEMO_KEY, type Family } from '../config/families';
 import type { FamilyModel, Issue } from '../data/types';
 import { parseCsv, UnreadableCsvError } from '../data/csv-parser';
 import { validateRows } from '../data/validate';
@@ -36,7 +36,7 @@ export function useFamilyData(family: Family, isOnlyDemo: boolean): DataState {
         const res = await fetch(family.csvUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const result = process(await res.text());
-        if (result.status === 'ready' && family.key === 'demo' && isOnlyDemo) {
+        if (result.status === 'ready' && family.key === DEMO_KEY && isOnlyDemo) {
           return done({ ...result, source: 'fallback', fallbackReason: 'no-config' });
         }
         return done(result);
@@ -44,7 +44,7 @@ export function useFamilyData(family: Family, isOnlyDemo: boolean): DataState {
         reason = e instanceof UnreadableCsvError ? 'unreadable' : 'load-failed';
       }
       try {
-        const demoUrl = families[families.length - 1].csvUrl; // demo is always last
+        const demoUrl = families.find((f) => f.key === DEMO_KEY)!.csvUrl; // demo always exists
         const result = process(await (await fetch(demoUrl)).text());
         if (result.status === 'ready') return done({ ...result, source: 'fallback', fallbackReason: reason });
         return done(result);
