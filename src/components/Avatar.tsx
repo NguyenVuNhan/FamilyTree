@@ -5,6 +5,7 @@ import { avatarHue, initials } from './avatar-utils';
 export function Avatar({ person, size }: { person: Person; size: number }) {
   const [broken, setBroken] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBroken(false);
   }, [person.imageSrc]);
   if (person.imageSrc && !broken) {
