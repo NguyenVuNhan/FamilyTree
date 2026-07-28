@@ -35,3 +35,29 @@ export function resolveFamily(families: Family[], param: string | null): Family 
   const key = param.toLowerCase();
   return families.find((f) => f.key === key);
 }
+
+/**
+ * Hermetic e2e guard: keep only the FAMILY_TREE_URL_/NAME_ pairs whose suffix is in
+ * `allowList` (case-insensitive); every other key passes through unchanged. Used by
+ * vite.config.ts so an ambient FAMILY_TREE_* env var (real repo variables, a leftover
+ * shell export, etc.) can't leak into an e2e dev server that didn't explicitly ask for it.
+ */
+export function filterFamilyEnv(
+  env: Record<string, string | undefined>,
+  allowList: string[],
+): Record<string, string | undefined> {
+  const allow = new Set(allowList.map((s) => s.toUpperCase()));
+  const result: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (key.startsWith(URL_PREFIX)) {
+      if (allow.has(key.slice(URL_PREFIX.length))) result[key] = value;
+      continue;
+    }
+    if (key.startsWith(NAME_PREFIX)) {
+      if (allow.has(key.slice(NAME_PREFIX.length))) result[key] = value;
+      continue;
+    }
+    result[key] = value;
+  }
+  return result;
+}

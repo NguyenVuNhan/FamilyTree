@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFamilies, resolveFamily } from './families';
+import { buildFamilies, filterFamilyEnv, resolveFamily } from './families';
 
 const BASE = '/';
 
@@ -62,5 +62,34 @@ describe('resolveFamily', () => {
 
   it('returns undefined for unknown names', () => {
     expect(resolveFamily(fams, 'nope')).toBeUndefined();
+  });
+});
+
+describe('filterFamilyEnv', () => {
+  it('drops URL/NAME pairs whose suffix is not in the allow list', () => {
+    const filtered = filterFamilyEnv({
+      FAMILY_TREE_URL_ALPHA: 'a-url',
+      FAMILY_TREE_NAME_ALPHA: 'Alpha',
+      FAMILY_TREE_URL_ZZZ: 'decoy-url',
+      FAMILY_TREE_NAME_ZZZ: 'Decoy',
+    }, ['ALPHA', 'BRAVO']);
+    expect(filtered).toEqual({ FAMILY_TREE_URL_ALPHA: 'a-url', FAMILY_TREE_NAME_ALPHA: 'Alpha' });
+  });
+
+  it('empty allow list drops every FAMILY_TREE_URL_/NAME_ pair', () => {
+    const filtered = filterFamilyEnv({
+      FAMILY_TREE_URL_ALPHA: 'a-url', FAMILY_TREE_NAME_ALPHA: 'Alpha',
+    }, []);
+    expect(filtered).toEqual({});
+  });
+
+  it('passes through unrelated keys unchanged', () => {
+    const filtered = filterFamilyEnv({ FAMILY_TREE_E2E_ONLY: 'ALPHA', FOO: 'bar' }, ['ALPHA']);
+    expect(filtered).toEqual({ FAMILY_TREE_E2E_ONLY: 'ALPHA', FOO: 'bar' });
+  });
+
+  it('allow-list match is case-insensitive on the suffix', () => {
+    const filtered = filterFamilyEnv({ FAMILY_TREE_URL_ALPHA: 'u' }, ['alpha']);
+    expect(filtered).toEqual({ FAMILY_TREE_URL_ALPHA: 'u' });
   });
 });

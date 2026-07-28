@@ -46,6 +46,14 @@ To turn a photo into base64 text for the `Image` cell: use any "image to base64"
 
 The reserved `demo` family is always present. A repo variable pair named `DEMO` (`FAMILY_TREE_URL_DEMO` / `FAMILY_TREE_NAME_DEMO`) collides with it and **fails the build**.
 
+## Deployment
+
+The `CI & Deploy` workflow (`.github/workflows/ci-deploy.yml`) builds, tests, and deploys to GitHub Pages on every push to `main` (and can be re-run manually via `workflow_dispatch`).
+
+### One-time setup
+
+The first deploy needs GitHub Pages enabled for this repo (source: **GitHub Actions**). The workflow does this itself — the deploy job's first step (`actions/configure-pages@v4` with `enablement: true`) turns Pages on if it isn't already, so no manual dashboard step is required. Just merge to `main` and let the workflow run.
+
 ## Development
 
 | Script | Purpose |
@@ -62,7 +70,7 @@ The reserved `demo` family is always present. A repo variable pair named `DEMO` 
 
 Run these by hand before/after a release — they aren't automatable in CI:
 
-- [ ] Real pinch-zoom on a physical touch device
+- [ ] Real pinch-zoom on a physical touch device (two-pointer pinch is implemented and unit-tested; still worth confirming it feels right on real hardware)
 - [ ] Real print dialog output on A4 and Letter paper, landscape orientation
 - [ ] Google Sheets publish-to-web round-trip with a live sheet (edit a cell, confirm it appears on refresh with no redeploy)
 - [ ] Adding a family via repo Variables end-to-end (create the two variables, re-run the workflow, open the shared URL)
