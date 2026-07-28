@@ -65,6 +65,38 @@ emma,Emma Ellis,,,david;sarah`);
   });
 });
 
+describe('validateRows implicit unions (ParentIDs pairs)', () => {
+  it('explicit partner a-b + child ParentIDs a;c → error naming a, both partners, both rows', () => {
+    const r = v(`${H}\na,Ann,,b,\nb,Bob,,,\nc,Cid,,,\nkid,Kid,,,a;c`);
+    const err = r.errors.find((e) => e.message.includes('"a"') && e.message.includes('unions'));
+    expect(err?.message).toMatch(/"b".*row 2.*"c".*row 5/s);
+  });
+
+  it('two children with ParentIDs a;b and a;c (no PartnerIDs) → error', () => {
+    const r = v(`${H}\na,Ann,,,\nb,Bob,,,\nc,Cid,,,\nkid1,Kid1,,,a;b\nkid2,Kid2,,,a;c`);
+    const err = r.errors.find((e) => e.message.includes('"a"') && e.message.includes('unions'));
+    expect(err?.message).toMatch(/"b".*row 5.*"c".*row 6/s);
+  });
+
+  it('no false positive: explicit partner a-b + child ParentIDs a;b (same pair) → clean', () => {
+    const r = v(`${H}\na,Ann,,b,\nb,Bob,,,\nkid,Kid,,,a;b`);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('single-parent overlap: ParentIDs a (lone) while a has partner b → error', () => {
+    const r = v(`${H}\na,Ann,,b,\nb,Bob,,,\nkid,Kid,,,a`);
+    const err = r.errors.find((e) => e.message.includes('"a"') && e.message.includes('unions'));
+    expect(err?.message).toMatch(/"b".*row 2.*lone parent.*row 4/s);
+  });
+
+  it('single parent with no other union → clean', () => {
+    const r = v(`${H}\na,Ann,,,\nkid,Kid,,,a`);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+});
+
 describe('validateRows warnings', () => {
   it('invalid image → warning with row, not error', () => {
     const r = v(`${H}\na,Ann,not-an-image!!,,`);
