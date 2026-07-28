@@ -5,7 +5,12 @@ export default defineConfig({
   testIgnore: '**/smoke/**',
   fullyParallel: true,
   ignoreSnapshots: !!process.env.CI, // visual regression is a local guard (per-platform baselines)
-  use: { baseURL: 'http://localhost:5173' },
+  reporter: process.env.CI ? [['html', { open: 'never' }]] : 'list',
+  use: {
+    baseURL: 'http://localhost:5173',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+  },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {

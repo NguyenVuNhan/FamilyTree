@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -25,10 +23,10 @@ jobs:
       - run: npm run lint
       - run: npm run test:coverage
       - name: Export FAMILY_TREE_* repo variables
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
         run: |
-          echo '${{ toJSON(vars) }}' \
-            | jq -r 'to_entries[] | select(.key | startswith("FAMILY_TREE_")) | "\(.key)=\(.value)"' \
-            >> "$GITHUB_ENV"
+          echo "$VARS_JSON" | jq -r 'to_entries[] | select(.key | startswith("FAMILY_TREE_")) | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
@@ -46,6 +44,9 @@ jobs:
     needs: ci
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

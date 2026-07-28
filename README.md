@@ -44,7 +44,7 @@ To turn a photo into base64 text for the `Image` cell: use any "image to base64"
 2. Re-run the `CI & Deploy` workflow (or push/merge to `main`) so the site rebuilds with the new family baked in.
 3. Share the family's URL: `https://<owner>.github.io/<repo>/?family=<name>` (`<name>` is `<NAME>` lowercased).
 
-The reserved `demo` family is always present and cannot be overridden by a repo variable named `DEMO`.
+The reserved `demo` family is always present. A repo variable pair named `DEMO` (`FAMILY_TREE_URL_DEMO` / `FAMILY_TREE_NAME_DEMO`) collides with it and **fails the build**.
 
 ## Development
 
@@ -53,7 +53,7 @@ The reserved `demo` family is always present and cannot be overridden by a repo 
 | `npm run dev` | Start the Vite dev server |
 | `npm test` | Run unit/component tests once |
 | `npm run test:coverage` | Run tests with the v8 coverage gate (≥80% lines/branches/functions/statements) |
-| `npm run test:e2e` | Run the local Playwright suite against a dev-server build with route-intercepted fixtures |
+| `npm run test:e2e` | Run the local Playwright suite against the Vite dev server, with route-intercepted fixtures |
 | `npm run test:smoke` | Run the post-deploy smoke suite against `SMOKE_BASE_URL` (real hosting, bundled demo data) |
 | `npm run lint` | Type-check (`tsc -b --noEmit`) and lint (`eslint .`) |
 | `npm run build` | Type-check and build for production (`dist/`) |
