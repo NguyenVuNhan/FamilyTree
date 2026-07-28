@@ -21,6 +21,15 @@ function setup(onBackgroundClick = vi.fn()) {
   return { api, onBackgroundClick, transform: () => screen.getByTestId('viewport-transform').style.transform };
 }
 
+function setupWithCard(onBackgroundClick = vi.fn()) {
+  render(
+    <PanZoomViewport contentSize={{ width: 500, height: 400 }} onBackgroundClick={onBackgroundClick}>
+      <button className="person-card">card</button>
+    </PanZoomViewport>,
+  );
+  return { onBackgroundClick, vp: screen.getByTestId('viewport'), card: screen.getByRole('button') };
+}
+
 describe('PanZoomViewport', () => {
   it('mounts fitted and centered (scale 1, centered translate)', () => {
     const { transform } = setup();
@@ -46,6 +55,24 @@ describe('PanZoomViewport', () => {
     fireEvent.pointerMove(vp, { clientX: 50, clientY: 50, pointerId: 1 });
     fireEvent.pointerUp(vp, { clientX: 50, clientY: 50, pointerId: 1 });
     expect(onBackgroundClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('a clean click that started on a card does not call onBackgroundClick, even when pointerup targets the card itself', () => {
+    const { onBackgroundClick, card } = setupWithCard();
+    fireEvent.pointerDown(card, { clientX: 5, clientY: 5, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(card, { clientX: 5, clientY: 5, pointerId: 1 });
+    expect(onBackgroundClick).not.toHaveBeenCalled();
+  });
+
+  it('a clean click that started on a card does not call onBackgroundClick, even when pointer capture retargets pointerup to the container', () => {
+    // Real browsers retarget pointerup to the capturing element (the container) once
+    // setPointerCapture has been engaged in pointerdown — closest('.person-card') on
+    // e.target would find nothing at pointerup time. The gesture must remember where
+    // it STARTED, before any retargeting happens.
+    const { onBackgroundClick, vp, card } = setupWithCard();
+    fireEvent.pointerDown(card, { clientX: 5, clientY: 5, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(vp, { clientX: 5, clientY: 5, pointerId: 1 });
+    expect(onBackgroundClick).not.toHaveBeenCalled();
   });
 
   it('wheel zooms and the api reports scalePct / zoomIn / zoomOut / fit', () => {

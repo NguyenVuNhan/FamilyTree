@@ -10,9 +10,12 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
   onBackgroundClick: () => void;
   viewportRef?: React.RefObject<ViewportApi | null>;
 }) {
+  const { width, height } = contentSize;
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<Viewport>({ x: 0, y: 0, scale: 1 });
-  const gesture = useRef<{ startX: number; startY: number; lastX: number; lastY: number; dragged: boolean } | null>(null);
+  const gesture = useRef<{
+    startX: number; startY: number; lastX: number; lastY: number; dragged: boolean; startedOnCard: boolean;
+  } | null>(null);
   const suppressClick = useRef(false);
 
   // Inlined (rather than delegated to a helper closure) so the ref read is
@@ -20,10 +23,10 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
   // react-hooks recognize the resulting setState call as ref-derived.
   const fit = () => {
     const r = container.current!.getBoundingClientRect();
-    setView(fitToView(contentSize, { width: r.width, height: r.height }));
+    setView(fitToView({ width, height }, { width: r.width, height: r.height }));
   };
 
-  useEffect(fit, [contentSize.width, contentSize.height]); // fit on mount and when the tree changes
+  useEffect(fit, [width, height]); // fit on mount and when the tree changes
 
   const center = () => {
     const r = container.current!.getBoundingClientRect();
@@ -44,8 +47,15 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
       data-testid="viewport"
       onPointerDown={(e) => {
         if (e.button !== 0) return;
+        // Capture whether the gesture STARTED on a card before setPointerCapture
+        // retargets later events (pointerup, click) to this container element —
+        // once capture is engaged, e.target on pointerup is always the container,
+        // so closest('.person-card') at that point would never find a card.
+        const startedOnCard = (e.target as HTMLElement).closest('.person-card') !== null;
         e.currentTarget.setPointerCapture(e.pointerId);
-        gesture.current = { startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY, dragged: false };
+        gesture.current = {
+          startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY, dragged: false, startedOnCard,
+        };
       }}
       onPointerMove={(e) => {
         const g = gesture.current;
@@ -59,13 +69,13 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
           setView((v) => pan(v, dx, dy));
         }
       }}
-      onPointerUp={(e) => {
+      onPointerUp={() => {
         const g = gesture.current;
         gesture.current = null;
         if (!g) return;
         if (g.dragged) {
           suppressClick.current = true; // swallow the click this gesture would synthesize
-        } else if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.person-card') === null) {
+        } else if (!g.startedOnCard) {
           onBackgroundClick();
         }
       }}
