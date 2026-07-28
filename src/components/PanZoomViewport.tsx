@@ -4,6 +4,10 @@ import { fitToView, isDrag, pan, zoomAt, type Viewport } from '../viewport/viewp
 
 export interface ViewportApi { zoomIn(): void; zoomOut(): void; fit(): void; scalePct: number }
 
+function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
 export function PanZoomViewport({ contentSize, children, onBackgroundClick, viewportRef, onScaleChange }: {
   contentSize: { width: number; height: number };
   children: React.ReactNode;
@@ -19,6 +23,11 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
     pointerId: number;
   } | null>(null);
   const suppressClick = useRef(false);
+  // Active pointers for two-finger pinch (id -> last known client coords), and the
+  // distance between the two pointers as of the previous move (the pinch's zoom
+  // baseline; recomputed every move so each step applies its own incremental factor).
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchDist = useRef<number | null>(null);
 
   // Inlined (rather than delegated to a helper closure) so the ref read is
   // directly visible to the effect that calls it — this is what lets
@@ -33,6 +42,22 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
   useEffect(() => {
     onScaleChange?.(Math.round(view.scale * 100));
   }, [view.scale, onScaleChange]);
+
+  // React's onWheel is passive at the root, so preventDefault() there can't stop the
+  // page from also scrolling (and, on ctrl+wheel, the browser's own page-zoom kicking
+  // in alongside ours). A native, non-passive listener lets us actually suppress it.
+  useEffect(() => {
+    const el = container.current;
+    if (!el) return;
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cursor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      setView((v) => zoomAt(v, cursor, e.deltaY < 0 ? 1.1 : 1 / 1.1));
+    };
+    el.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => el.removeEventListener('wheel', onWheelNative);
+  }, []);
 
   const center = () => {
     const r = container.current!.getBoundingClientRect();
@@ -53,6 +78,17 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
       data-testid="viewport"
       onPointerDown={(e) => {
         if (e.button !== 0) return;
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.current.size === 2) {
+          // Second finger down: this becomes a pinch. Mark any in-progress single-pointer
+          // gesture as "dragged" so its eventual pointerup suppresses the synthesized click
+          // instead of treating it as a background click.
+          if (gesture.current) gesture.current.dragged = true;
+          const [a, b] = [...pointers.current.values()];
+          pinchDist.current = distance(a, b);
+          return;
+        }
+        if (pointers.current.size > 2) return; // ignore a third+ pointer
         // Capture whether the gesture STARTED on a card. Deliberately do NOT call
         // setPointerCapture here: per the Pointer Events spec, once a pointer is
         // captured, the resulting click (and mousedown/mouseup) is retargeted to
@@ -66,6 +102,20 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
         };
       }}
       onPointerMove={(e) => {
+        if (pointers.current.has(e.pointerId)) {
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        }
+        if (pointers.current.size >= 2) {
+          const [a, b] = [...pointers.current.values()];
+          const currDist = distance(a, b);
+          if (pinchDist.current) {
+            const rect = container.current!.getBoundingClientRect();
+            const mid = { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top };
+            flushSync(() => setView((v) => zoomAt(v, mid, currDist / pinchDist.current!)));
+          }
+          pinchDist.current = currDist;
+          return; // pinch handled; single-pointer pan/click logic does not apply
+        }
         const g = gesture.current;
         if (!g) return;
         if (!g.dragged && isDrag({ x: g.startX, y: g.startY }, { x: e.clientX, y: e.clientY })) {
@@ -86,6 +136,8 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
         }
       }}
       onPointerUp={(e) => {
+        pointers.current.delete(e.pointerId);
+        if (pointers.current.size < 2) pinchDist.current = null;
         const g = gesture.current;
         gesture.current = null;
         if (!g) return;
@@ -97,17 +149,17 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
           onBackgroundClick();
         }
       }}
+      onPointerCancel={(e) => {
+        pointers.current.delete(e.pointerId);
+        if (pointers.current.size < 2) pinchDist.current = null;
+        gesture.current = null;
+      }}
       onClickCapture={(e) => {
         if (suppressClick.current) {
           suppressClick.current = false;
           e.stopPropagation();
           e.preventDefault();
         }
-      }}
-      onWheel={(e) => {
-        const rect = container.current!.getBoundingClientRect();
-        const cursor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        setView((v) => zoomAt(v, cursor, e.deltaY < 0 ? 1.1 : 1 / 1.1));
       }}
     >
       <div

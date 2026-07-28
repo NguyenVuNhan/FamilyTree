@@ -112,6 +112,52 @@ describe('PanZoomViewport', () => {
     expect(api.current!.scalePct).toBe(110);
   });
 
+  it('two-pointer pinch zooms anchored at the midpoint of the two touches', () => {
+    const { transform } = setup();
+    const vp = screen.getByTestId('viewport');
+    fireEvent.pointerDown(vp, { clientX: 400, clientY: 400, pointerId: 1, button: 0 });
+    fireEvent.pointerDown(vp, { clientX: 600, clientY: 400, pointerId: 2, button: 0 });
+    // distance 200 -> 400 (2x factor), anchored at midpoint (600, 400):
+    // scale 1->2; x = 600 - (600-250)*2 = -100; y = 400 - (400-200)*2 = 0
+    fireEvent.pointerMove(vp, { clientX: 800, clientY: 400, pointerId: 2 });
+    expect(transform()).toBe('translate(-100px, 0px) scale(2)');
+  });
+
+  it('pinch suppresses background click and does not pan', () => {
+    const { onBackgroundClick } = setup();
+    const vp = screen.getByTestId('viewport');
+    fireEvent.pointerDown(vp, { clientX: 400, clientY: 400, pointerId: 1, button: 0 });
+    fireEvent.pointerDown(vp, { clientX: 600, clientY: 400, pointerId: 2, button: 0 });
+    fireEvent.pointerMove(vp, { clientX: 800, clientY: 400, pointerId: 2 });
+    fireEvent.pointerUp(vp, { clientX: 800, clientY: 400, pointerId: 2 });
+    fireEvent.pointerUp(vp, { clientX: 400, clientY: 400, pointerId: 1 });
+    expect(onBackgroundClick).not.toHaveBeenCalled();
+  });
+
+  it('pinch does not call onBackgroundClick even when it starts on a card', () => {
+    const { onBackgroundClick, card } = setupWithCard();
+    fireEvent.pointerDown(card, { clientX: 400, clientY: 400, pointerId: 1, button: 0 });
+    fireEvent.pointerDown(card, { clientX: 600, clientY: 400, pointerId: 2, button: 0 });
+    fireEvent.pointerMove(card, { clientX: 800, clientY: 400, pointerId: 2 });
+    fireEvent.pointerUp(card, { clientX: 800, clientY: 400, pointerId: 2 });
+    fireEvent.pointerUp(card, { clientX: 400, clientY: 400, pointerId: 1 });
+    expect(onBackgroundClick).not.toHaveBeenCalled();
+  });
+
+  it('pointercancel clears the gesture and the pinch pointer map (next single-pointer drag behaves fresh)', () => {
+    const { transform } = setup();
+    const vp = screen.getByTestId('viewport');
+    fireEvent.pointerDown(vp, { clientX: 400, clientY: 400, pointerId: 1, button: 0 });
+    fireEvent.pointerDown(vp, { clientX: 600, clientY: 400, pointerId: 2, button: 0 });
+    fireEvent.pointerCancel(vp, { pointerId: 2 });
+    fireEvent.pointerCancel(vp, { pointerId: 1 });
+    // a fresh single-pointer drag afterwards behaves normally (no leftover pinch state)
+    fireEvent.pointerDown(vp, { clientX: 100, clientY: 100, pointerId: 3, button: 0 });
+    fireEvent.pointerMove(vp, { clientX: 160, clientY: 130, pointerId: 3 });
+    fireEvent.pointerUp(vp, { clientX: 160, clientY: 130, pointerId: 3 });
+    expect(transform()).toBe('translate(310px, 230px) scale(1)');
+  });
+
   it('calls onScaleChange whenever the scale changes, including on mount', () => {
     const onScaleChange = vi.fn();
     const api = createRef<ViewportApi | null>() as React.MutableRefObject<ViewportApi | null>;
