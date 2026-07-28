@@ -1,15 +1,20 @@
 import { expect, test } from '@playwright/test';
 import { card, serveCsv } from './helpers';
 
+test.beforeEach(async ({ page }) => {
+  await page.route('https://img.example/**', (r) => r.abort()); // disconnected.csv carries margaret's image URL
+});
+
 const open = async (page: import('@playwright/test').Page, fixtureName: string) => {
   await serveCsv(page, { fixtureName });
   await page.goto('/?family=alpha');
 };
 const paths = (page: import('@playwright/test').Page) => page.getByTestId('connector-layer').locator('path');
 
-test('E2E-12: single person — one card, zero connectors, no console errors (UC-13)', async ({ page }) => {
+test('E2E-12: single person — one card, zero connectors, no console/page errors (UC-13)', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  page.on('pageerror', (e) => errors.push(e.message));
   await open(page, 'single.csv');
   await expect(page.locator('.person-card')).toHaveCount(1);
   await expect(paths(page)).toHaveCount(0);
@@ -39,7 +44,10 @@ test('E2E-15: 5-generation chain renders and fits (UC-16)', async ({ page }) => 
 test('E2E-16: 9 siblings — no overlapping cards, parents centered (UC-17)', async ({ page }) => {
   await open(page, 'wide9.csv');
   const boxes = await page.locator('.person-card').evaluateAll((els) =>
-    els.map((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }),
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { id: el.getAttribute('data-person-id'), x: r.x, y: r.y, w: r.width, h: r.height };
+    }),
   );
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
@@ -48,6 +56,23 @@ test('E2E-16: 9 siblings — no overlapping cards, parents centered (UC-17)', as
       expect(overlap).toBe(false);
     }
   }
+
+  // parents centered: the union's own midpoint (between ma/pa) must line up with the
+  // midpoint of the 9-child span — layout-engine.ts centers both the union and its
+  // children within the same slot width, so these are analytically identical (mod
+  // floating rounding), regardless of the fit-to-view scale applied on top.
+  // Both midpoints are derived from the single `boxes` snapshot above (not fresh
+  // boundingBox() calls) — separate round-trips raced the fit-to-view transform
+  // settling and produced spurious ~100px+ diffs under repeated/parallel runs.
+  const maBox = boxes.find((b) => b.id === 'ma')!;
+  const paBox = boxes.find((b) => b.id === 'pa')!;
+  const parentMid = ((maBox.x + maBox.w / 2) + (paBox.x + paBox.w / 2)) / 2;
+  const childBoxes = boxes.filter((b) => /^k\d$/.test(b.id ?? ''));
+  expect(childBoxes).toHaveLength(9);
+  const spanLeft = Math.min(...childBoxes.map((b) => b.x));
+  const spanRight = Math.max(...childBoxes.map((b) => b.x + b.w));
+  const childrenMid = (spanLeft + spanRight) / 2;
+  expect(Math.abs(parentMid - childrenMid)).toBeLessThan(2);
 });
 
 test('E2E-17: disconnected family — largest renders, notice lists excluded ids (UC-19)', async ({ page }) => {
