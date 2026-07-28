@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { defaultDisplayMode, families } from '../config';
 import { resolveFamily } from '../config/families';
-import type { DisplayMode } from '../data/types';
-import { layoutTree } from '../layout/layout-engine';
+import type { DisplayMode, Issue } from '../data/types';
+import { layoutTree, unplacedIds } from '../layout/layout-engine';
 import { ErrorPanel } from './ErrorPanel';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
 import { SampleDataBanner } from './SampleDataBanner';
@@ -46,6 +46,17 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
     [data],
   );
 
+  // Never a silently wrong tree (spec §6): if the single-root layout walk couldn't
+  // reach everyone in the model (e.g. a rendered child's spouse's own parents form a
+  // second root-candidate union), surface it rather than dropping them without a trace.
+  const warnings = useMemo((): Issue[] => {
+    if (data.status !== 'ready' || !layout) return [];
+    const missing = unplacedIds(data.model, layout);
+    return missing.length > 0
+      ? [...data.warnings, { message: `In this version, relatives connected only through an in-law are not shown: ${missing.join(', ')}` }]
+      : data.warnings;
+  }, [data, layout]);
+
   useEffect(() => {
     if (!layout) return;
     const onBeforePrint = () => {
@@ -76,9 +87,9 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
       {data.source === 'fallback' && !bannerDismissed && data.fallbackReason && (
         <SampleDataBanner reason={data.fallbackReason} onDismiss={() => setBannerDismissed(true)} />
       )}
-      {data.warnings.length > 0 && (
+      {warnings.length > 0 && (
         <div className="warnings" data-testid="warnings">
-          {data.warnings.map((w, i) => <p key={i}>{w.message}</p>)}
+          {warnings.map((w, i) => <p key={i}>{w.message}</p>)}
         </div>
       )}
       <PanZoomViewport

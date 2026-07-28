@@ -65,4 +65,24 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByTestId('error-panel')).toHaveTextContent(/ghost/);
   });
+
+  it('warns about relatives orphaned by a second root-candidate union (multi-root sheet)', async () => {
+    // son's spouse's own parents (fa+mo) form a second root-candidate union that the
+    // single-root layout walk never reaches from ra+rb's side — must warn, not drop silently.
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      text: async () => `ID,FullName,Image,PartnerID,ParentIDs
+ra,Ra,,rb,
+rb,Rb,,,
+son,Son,,wife,ra;rb
+fa,Fa,,mo,
+mo,Mo,,,
+wife,Wife,,,fa;mo`,
+    }) as Response));
+    render(<App />);
+    const warnings = await screen.findByTestId('warnings');
+    expect(warnings).toHaveTextContent(/in-law/i);
+    expect(warnings).toHaveTextContent('fa');
+    expect(warnings).toHaveTextContent('mo');
+  });
 });

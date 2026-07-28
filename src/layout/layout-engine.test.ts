@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCsv } from '../data/csv-parser';
 import { buildModel } from '../data/build-model';
-import { layoutTree } from './layout-engine';
+import { layoutTree, unplacedIds } from './layout-engine';
 import { CARD_H, CARD_W, COUPLE_GAP, GEN_GAP, MARGIN, SIBLING_GAP } from './constants';
 
 const H = 'ID,FullName,Image,PartnerID,ParentIDs';
@@ -62,5 +62,68 @@ describe('layoutTree', () => {
       expect(c.x + CARD_W).toBeLessThanOrEqual(r.width);
       expect(c.y + CARD_H).toBeLessThanOrEqual(r.height);
     }
+  });
+});
+
+describe('multi-root sheets (a rendered child\'s spouse\'s parents are also present)', () => {
+  // ra+rb is the root union (son's parents). son marries wife; wife's own parents
+  // (fa+mo) are a second root-candidate union in the same connected component, but
+  // the single-root tree walk never reaches them from ra+rb's side.
+  const CSV = `${H}
+ra,Ra,,rb,
+rb,Rb,,,
+son,Son,,wife,ra;rb
+fa,Fa,,mo,
+mo,Mo,,,
+wife,Wife,,,fa;mo`;
+
+  it('the orphaned in-laws never get a card', () => {
+    const model = buildModel(parseCsv(CSV));
+    const layout = layoutTree(model);
+    const ids = layout.cards.map((c) => c.personId);
+    expect(ids).not.toContain('fa');
+    expect(ids).not.toContain('mo');
+  });
+
+  it('unplacedIds reports exactly the orphaned in-laws', () => {
+    const model = buildModel(parseCsv(CSV));
+    const layout = layoutTree(model);
+    expect(unplacedIds(model, layout)).toEqual(['fa', 'mo']);
+  });
+
+  it('unplacedIds is empty for an ordinary well-formed tree', () => {
+    const model = buildModel(parseCsv(`${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa`));
+    const layout = layoutTree(model);
+    expect(unplacedIds(model, layout)).toEqual([]);
+  });
+});
+
+describe('two rendered children marrying each other (dedupes the shared union)', () => {
+  // g1+g2 is root, with children m and f. m marries x (child: a); f marries y (child:
+  // b). a and b — each a rendered grandchild from a different branch — marry each other.
+  const CSV = `${H}
+g1,G1,,g2,
+g2,G2,,,
+m,M,,x,g1;g2
+f,F,,y,g1;g2
+x,X,,,
+y,Y,,,
+a,A,,b,m;x
+b,B,,,f;y`;
+
+  it('every person appears exactly once in layout.cards (no duplicate keys)', () => {
+    const model = buildModel(parseCsv(CSV));
+    const layout = layoutTree(model);
+    const ids = layout.cards.map((c) => c.personId);
+    const counts = new Map<string, number>();
+    for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+    for (const [id, count] of counts) expect(count, `${id} appeared ${count} times`).toBe(1);
+    expect(new Set(ids)).toEqual(new Set(['g1', 'g2', 'm', 'x', 'f', 'y', 'a', 'b']));
+  });
+
+  it('nothing is left unplaced — the shared union is rendered once, not dropped', () => {
+    const model = buildModel(parseCsv(CSV));
+    const layout = layoutTree(model);
+    expect(unplacedIds(model, layout)).toEqual([]);
   });
 });

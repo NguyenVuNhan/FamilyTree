@@ -20,11 +20,24 @@ export function layoutTree(model: FamilyModel): LayoutResult {
   const unionOfPartner = new Map<string, Union>();
   for (const u of model.unions) for (const p of u.partners) unionOfPartner.set(p, u);
 
-  const toNode = (personId: string): Node => {
+  // A union can be reachable from more than one branch — e.g. two people who each
+  // render as a child elsewhere later marry each other (cousins marrying). Walk each
+  // union at most once: whichever branch reaches it first renders it (and its
+  // descendants) in full; a later branch that would reach the same union again drops
+  // that child slot entirely instead of re-walking (and duplicating) it — the shared
+  // person already has a card from the first branch.
+  const visitedUnions = new Set<string>();
+
+  const toNode = (personId: string): Node | null => {
     const u = unionOfPartner.get(personId);
-    return u ? unionNode(u) : { kind: 'person', personId };
+    if (!u) return { kind: 'person', personId };
+    if (visitedUnions.has(u.id)) return null;
+    return unionNode(u);
   };
-  const unionNode = (u: Union): Node => ({ kind: 'union', union: u, children: u.childIds.map(toNode) });
+  const unionNode = (u: Union): Node => {
+    visitedUnions.add(u.id);
+    return { kind: 'union', union: u, children: u.childIds.map(toNode).filter((n): n is Node => n !== null) };
+  };
 
   const root: Node = model.rootId.startsWith('p:')
     ? { kind: 'person', personId: model.rootId.slice(2) }
@@ -89,4 +102,15 @@ export function layoutTree(model: FamilyModel): LayoutResult {
     width: widths.get(root)! + 2 * MARGIN,
     height: depthMax + CARD_H + MARGIN,
   };
+}
+
+/**
+ * Persons present in the model (single connected component) that never received a card —
+ * e.g. a rendered child's spouse's parents form a second root-candidate union that the
+ * single-root tree walk in layoutTree never reaches. Never a silent drop: callers should
+ * surface this as a warning (spec §6).
+ */
+export function unplacedIds(model: FamilyModel, layout: LayoutResult): string[] {
+  const placed = new Set(layout.cards.map((c) => c.personId));
+  return [...model.persons.keys()].filter((id) => !placed.has(id)).sort();
 }
