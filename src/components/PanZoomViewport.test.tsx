@@ -85,4 +85,28 @@ describe('PanZoomViewport', () => {
     api.current!.zoomIn();
     expect(api.current!.scalePct).toBe(110);
   });
+
+  it('calls onScaleChange whenever the scale changes, including on mount', () => {
+    const onScaleChange = vi.fn();
+    const api = createRef<ViewportApi | null>() as React.MutableRefObject<ViewportApi | null>;
+    render(
+      <PanZoomViewport
+        contentSize={{ width: 500, height: 400 }}
+        onBackgroundClick={vi.fn()}
+        viewportRef={api}
+        onScaleChange={onScaleChange}
+      >
+        <div>content</div>
+      </PanZoomViewport>,
+    );
+    expect(onScaleChange).toHaveBeenCalledWith(100);
+    onScaleChange.mockClear();
+
+    fireEvent.wheel(screen.getByTestId('viewport'), { deltaY: -100, clientX: 500, clientY: 400 });
+    expect(onScaleChange).toHaveBeenCalledWith(110);
+
+    onScaleChange.mockClear();
+    api.current!.zoomOut();
+    expect(onScaleChange).toHaveBeenCalledWith(100);
+  });
 });

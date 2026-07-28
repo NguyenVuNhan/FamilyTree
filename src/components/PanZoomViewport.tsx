@@ -4,11 +4,12 @@ import { fitToView, isDrag, pan, zoomAt, type Viewport } from '../viewport/viewp
 
 export interface ViewportApi { zoomIn(): void; zoomOut(): void; fit(): void; scalePct: number }
 
-export function PanZoomViewport({ contentSize, children, onBackgroundClick, viewportRef }: {
+export function PanZoomViewport({ contentSize, children, onBackgroundClick, viewportRef, onScaleChange }: {
   contentSize: { width: number; height: number };
   children: React.ReactNode;
   onBackgroundClick: () => void;
   viewportRef?: React.RefObject<ViewportApi | null>;
+  onScaleChange?: (pct: number) => void;
 }) {
   const { width, height } = contentSize;
   const container = useRef<HTMLDivElement>(null);
@@ -27,6 +28,10 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
   };
 
   useEffect(fit, [width, height]); // fit on mount and when the tree changes
+
+  useEffect(() => {
+    onScaleChange?.(Math.round(view.scale * 100));
+  }, [view.scale, onScaleChange]);
 
   const center = () => {
     const r = container.current!.getBoundingClientRect();
