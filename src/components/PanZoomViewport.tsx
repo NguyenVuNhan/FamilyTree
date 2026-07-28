@@ -16,6 +16,7 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
   const [view, setView] = useState<Viewport>({ x: 0, y: 0, scale: 1 });
   const gesture = useRef<{
     startX: number; startY: number; lastX: number; lastY: number; dragged: boolean; startedOnCard: boolean;
+    pointerId: number;
   } | null>(null);
   const suppressClick = useRef(false);
 
@@ -52,20 +53,30 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
       data-testid="viewport"
       onPointerDown={(e) => {
         if (e.button !== 0) return;
-        // Capture whether the gesture STARTED on a card before setPointerCapture
-        // retargets later events (pointerup, click) to this container element —
-        // once capture is engaged, e.target on pointerup is always the container,
-        // so closest('.person-card') at that point would never find a card.
+        // Capture whether the gesture STARTED on a card. Deliberately do NOT call
+        // setPointerCapture here: per the Pointer Events spec, once a pointer is
+        // captured, the resulting click (and mousedown/mouseup) is retargeted to
+        // the capturing element — a plain click on a card would never reach the
+        // card's own onClick. We only engage capture once we know it's a real
+        // drag (see onPointerMove), so a simple click dispatches natively.
         const startedOnCard = (e.target as HTMLElement).closest('.person-card') !== null;
-        e.currentTarget.setPointerCapture(e.pointerId);
         gesture.current = {
           startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY, dragged: false, startedOnCard,
+          pointerId: e.pointerId,
         };
       }}
       onPointerMove={(e) => {
         const g = gesture.current;
         if (!g) return;
-        if (isDrag({ x: g.startX, y: g.startY }, { x: e.clientX, y: e.clientY })) g.dragged = true;
+        if (!g.dragged && isDrag({ x: g.startX, y: g.startY }, { x: e.clientX, y: e.clientY })) {
+          g.dragged = true;
+          // Engage capture only now, so panning continues even if the pointer
+          // leaves the viewport bounds mid-drag. Best-effort: synthetic/untrusted
+          // pointer events (e.g. dispatchEvent-driven touch simulation in tests)
+          // have no real "active pointer" session, so the browser may reject
+          // capture — that's fine, pan still works via normal event delegation.
+          try { e.currentTarget.setPointerCapture(g.pointerId); } catch { /* no active pointer to capture */ }
+        }
         if (g.dragged) {
           const dx = e.clientX - g.lastX;
           const dy = e.clientY - g.lastY;
@@ -74,11 +85,13 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
           setView((v) => pan(v, dx, dy));
         }
       }}
-      onPointerUp={() => {
+      onPointerUp={(e) => {
         const g = gesture.current;
         gesture.current = null;
         if (!g) return;
         if (g.dragged) {
+          // Capture was engaged in onPointerMove once dragged (best-effort — see there).
+          try { e.currentTarget.releasePointerCapture(g.pointerId); } catch { /* was never captured */ }
           suppressClick.current = true; // swallow the click this gesture would synthesize
         } else if (!g.startedOnCard) {
           onBackgroundClick();
