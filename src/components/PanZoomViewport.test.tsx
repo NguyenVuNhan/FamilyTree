@@ -64,15 +64,41 @@ describe('PanZoomViewport', () => {
     expect(onBackgroundClick).not.toHaveBeenCalled();
   });
 
-  it('a clean click that started on a card does not call onBackgroundClick, even when pointer capture retargets pointerup to the container', () => {
-    // Real browsers retarget pointerup to the capturing element (the container) once
-    // setPointerCapture has been engaged in pointerdown — closest('.person-card') on
-    // e.target would find nothing at pointerup time. The gesture must remember where
-    // it STARTED, before any retargeting happens.
+  it('a clean click that started on a card does not call onBackgroundClick, even when pointerup is (re)targeted at the container', () => {
+    // With deferred capture, a no-move gesture never engages setPointerCapture, so this
+    // isn't exercising real browser retargeting — it's proving the gesture remembers
+    // where it STARTED (startedOnCard, captured at pointerdown) rather than trusting
+    // e.target at pointerup time, which is what protects against the case where capture
+    // *is* engaged (a real drag) and retargeting genuinely happens.
     const { onBackgroundClick, vp, card } = setupWithCard();
     fireEvent.pointerDown(card, { clientX: 5, clientY: 5, pointerId: 1, button: 0 });
     fireEvent.pointerUp(vp, { clientX: 5, clientY: 5, pointerId: 1 });
     expect(onBackgroundClick).not.toHaveBeenCalled();
+  });
+
+  it('a plain click (no movement past the drag threshold) never engages setPointerCapture', () => {
+    // This pins the deferred-capture fix: capture must only be engaged once a real drag
+    // is detected, otherwise the resulting click gets retargeted to the container and a
+    // card's own onClick (expand/collapse) can never fire in a real browser. A regression
+    // back to "capture on every pointerdown" would pass every other test in this file but
+    // would call setPointerCapture here — that's exactly what this test catches.
+    const { vp } = setupWithCard();
+    fireEvent.pointerDown(vp, { clientX: 100, clientY: 100, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(vp, { clientX: 100, clientY: 100, pointerId: 1 });
+    expect(Element.prototype.setPointerCapture).not.toHaveBeenCalled();
+  });
+
+  it('a drag past the threshold engages capture exactly once and releases it exactly once on pointerup', () => {
+    const { vp } = setupWithCard();
+    fireEvent.pointerDown(vp, { clientX: 100, clientY: 100, pointerId: 1, button: 0 });
+    fireEvent.pointerMove(vp, { clientX: 160, clientY: 130, pointerId: 1 }); // hypot(60,30) > 5px threshold
+    expect(Element.prototype.setPointerCapture).toHaveBeenCalledTimes(1);
+    expect(Element.prototype.setPointerCapture).toHaveBeenCalledWith(1);
+    expect(Element.prototype.releasePointerCapture).not.toHaveBeenCalled();
+    fireEvent.pointerUp(vp, { clientX: 160, clientY: 130, pointerId: 1 });
+    expect(Element.prototype.setPointerCapture).toHaveBeenCalledTimes(1); // still just the once
+    expect(Element.prototype.releasePointerCapture).toHaveBeenCalledTimes(1);
+    expect(Element.prototype.releasePointerCapture).toHaveBeenCalledWith(1);
   });
 
   it('wheel zooms and the api reports scalePct / zoomIn / zoomOut / fit', () => {
