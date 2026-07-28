@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Person } from '../data/types';
 import { avatarHue, initials } from './avatar-utils';
 
 export function Avatar({ person, size }: { person: Person; size: number }) {
   const [broken, setBroken] = useState(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  const [prevSrc, setPrevSrc] = useState(person.imageSrc);
+  if (prevSrc !== person.imageSrc) {
+    setPrevSrc(person.imageSrc);
     setBroken(false);
-  }, [person.imageSrc]);
+  }
   if (person.imageSrc && !broken) {
     return (
       <img
