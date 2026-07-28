@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Person } from '../data/types';
 import { avatarHue, initials } from './avatar-utils';
 
 export function Avatar({ person, size }: { person: Person; size: number }) {
   const [broken, setBroken] = useState(false);
+  useEffect(() => {
+    setBroken(false);
+  }, [person.imageSrc]);
   if (person.imageSrc && !broken) {
     return (
       <img

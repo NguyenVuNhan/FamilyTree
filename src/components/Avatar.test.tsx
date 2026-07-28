@@ -18,4 +18,12 @@ describe('Avatar', () => {
     fireEvent.error(screen.getByRole('img', { name: 'Ann Lee' }));
     expect(screen.getByRole('img', { name: 'Ann Lee' })).toHaveTextContent('AL');
   });
+
+  it('resets broken state when imageSrc changes', () => {
+    const { rerender } = render(<Avatar person={{ id: 'a', fullName: 'Ann Lee', imageSrc: 'https://x.test/broken.jpg' }} size={52} />);
+    fireEvent.error(screen.getByRole('img', { name: 'Ann Lee' }));
+    expect(screen.getByRole('img', { name: 'Ann Lee' })).toHaveTextContent('AL');
+    rerender(<Avatar person={{ id: 'b', fullName: 'Bob Smith', imageSrc: 'https://x.test/valid.jpg' }} size={52} />);
+    expect(screen.getByRole('img', { name: 'Bob Smith' })).toHaveAttribute('src', 'https://x.test/valid.jpg');
+  });
 });
