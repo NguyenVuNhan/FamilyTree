@@ -42,4 +42,19 @@ describe('PersonCard', () => {
     render(<PersonCard {...base} mode="photo" expanded={true} />);
     expect(screen.getByRole('button')).toHaveAttribute('data-expanded', 'true');
   });
+
+  it('exposes data-person-id for e2e targeting', () => {
+    render(<PersonCard {...base} mode="photo" expanded={false} />);
+    expect(screen.getByRole('button')).toHaveAttribute('data-person-id', 'a');
+  });
+
+  it('applies "person-card" class collapsed, and adds "expanded" when expanded', () => {
+    const { rerender } = render(<PersonCard {...base} mode="photo" expanded={false} />);
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('person-card');
+    expect(button).not.toHaveClass('expanded');
+
+    rerender(<PersonCard {...base} mode="photo" expanded={true} />);
+    expect(screen.getByRole('button')).toHaveClass('person-card', 'expanded');
+  });
 });

@@ -12,6 +12,13 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('zoom-pct')).toHaveTextContent('80%');
   });
 
+  it('pins e2e-bound container classes and the segmented group', () => {
+    const { container } = render(<Toolbar {...noop} title="Demo Family" mode="photo" scalePct={80} />);
+    expect(container.querySelector('header')).toHaveClass('toolbar');
+    expect(screen.getByRole('group', { name: 'Card display mode' })).toHaveClass('segmented');
+    expect(container.querySelector('.zoom-controls')).not.toBeNull();
+  });
+
   it('mode toggle reflects state and fires onMode', async () => {
     const onMode = vi.fn();
     render(<Toolbar {...noop} onMode={onMode} title="T" mode="photo" scalePct={100} />);
