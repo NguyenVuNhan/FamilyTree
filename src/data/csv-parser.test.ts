@@ -39,4 +39,20 @@ describe('parseCsv', () => {
     expect(() => parseCsv('<!doctype html><html>Sorry</html>')).toThrow(UnreadableCsvError);
     expect(() => parseCsv('Name,Notes\nBob,hi')).toThrow(UnreadableCsvError);
   });
+
+  it('skips comma-only blank rows (all fields empty after trimming)', () => {
+    const rows = parseCsv(`${HEADER}\nmargaret,Margaret Ellis,,robert,\n,,,,\nrobert,Robert Ellis,,,`);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].id).toBe('margaret');
+    expect(rows[1].id).toBe('robert');
+  });
+
+  it('preserves true sheet row numbers across interior blank lines', () => {
+    const rows = parseCsv(`${HEADER}\npersonA,Person A,,,\n,,,,\npersonB,Person B,,,`);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].rowNumber).toBe(2);
+    expect(rows[0].id).toBe('personA');
+    expect(rows[1].rowNumber).toBe(4);
+    expect(rows[1].id).toBe('personB');
+  });
 });
