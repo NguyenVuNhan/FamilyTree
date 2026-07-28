@@ -58,15 +58,31 @@ export function buildModel(rows: PersonRow[]): FamilyModel {
     }
     comp++;
   }
-  const sizes = new Map<number, number>();
-  for (const c of componentOf.values()) sizes.set(c, (sizes.get(c) ?? 0) + 1);
-  const maxSize = Math.max(0, ...sizes.values());
+  // Exactly one component renders (the layout engine walks a single root); on a tie,
+  // prefer the component containing the person whose sheet row comes first — deterministic.
+  const rowNumberOf = new Map<string, number>();
+  rows.forEach((row, index) => rowNumberOf.set(row.id, row.rowNumber ?? index));
 
-  // Keep every component tied for the largest size; exclude only strictly smaller ones
-  // (see FamilyModel.excludedIds: "people in smaller disconnected components").
-  const excludedIds = [...persons.keys()]
-    .filter((id) => sizes.get(componentOf.get(id)!) !== maxSize)
-    .sort();
+  const sizes = new Map<number, number>();
+  const minRowByComp = new Map<number, number>();
+  for (const [id, c] of componentOf) {
+    sizes.set(c, (sizes.get(c) ?? 0) + 1);
+    const rowNumber = rowNumberOf.get(id) ?? Infinity;
+    if (!minRowByComp.has(c) || rowNumber < minRowByComp.get(c)!) minRowByComp.set(c, rowNumber);
+  }
+  let keep = -1;
+  let bestSize = -1;
+  let bestMinRow = Infinity;
+  for (const [c, size] of sizes) {
+    const minRow = minRowByComp.get(c)!;
+    if (size > bestSize || (size === bestSize && minRow < bestMinRow)) {
+      keep = c;
+      bestSize = size;
+      bestMinRow = minRow;
+    }
+  }
+
+  const excludedIds = [...persons.keys()].filter((id) => componentOf.get(id) !== keep).sort();
   for (const id of excludedIds) persons.delete(id);
   const keptUnions = [...unions.values()].filter((u) => persons.has(u.partners[0]));
 

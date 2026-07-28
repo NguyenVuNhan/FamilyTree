@@ -7,7 +7,7 @@ const m = (csv: string) => buildModel(parseCsv(csv));
 
 describe('buildModel', () => {
   it('builds persons with resolved image src', () => {
-    const model = m(`${H}\na,Ann,https://x.test/a.jpg,,\nb,Bob,,,`);
+    const model = m(`${H}\na,Ann,https://x.test/a.jpg,b,\nb,Bob,,,`);
     expect(model.persons.get('a')).toEqual({ id: 'a', fullName: 'Ann', imageSrc: 'https://x.test/a.jpg' });
     expect(model.persons.get('b')).toEqual({ id: 'b', fullName: 'Bob' });
   });
@@ -56,5 +56,11 @@ aa,Loner A,,,`);
   it('children keep sheet order within a union', () => {
     const model = m(`${H}\nma,Ma,,,\nz,Zed,,,ma\na,Ann,,,ma`);
     expect(model.unions[0].childIds).toEqual(['z', 'a']);
+  });
+
+  it('tie-break: earlier sheet row wins when components are equal size', () => {
+    const model = m(`${H}\nz,Zed,,,\na,Ann,,,`);
+    expect(model.excludedIds).toEqual(['a']);
+    expect(model.rootId).toBe('p:z');
   });
 });
