@@ -1,2 +1,9 @@
-.superpowers
+node_modules
+dist
+coverage
+test-results
+playwright-report
+.superpowers/
 .claude
+.env
+.env.local
