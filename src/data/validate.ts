@@ -62,10 +62,17 @@ export function validateRows(rows: PersonRow[]): ValidationResult {
   }
   for (const [target, claimants] of claims) {
     if (claimants.length > 1) {
-      const [a, b] = claimants;
-      errors.push({
-        message: `"${target}" is linked as partner by both "${a.id}" (row ${a.rowNumber}) and "${b.id}" (row ${b.rowNumber}) — one person can only appear in one couple`,
-      });
+      const named = claimants.map((c) => `"${c.id}" (row ${c.rowNumber})`);
+      if (named.length === 2) {
+        errors.push({
+          message: `"${target}" is linked as partner by both ${named[0]} and ${named[1]} — one person can only appear in one couple`,
+        });
+      } else {
+        const list = `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
+        errors.push({
+          message: `"${target}" is linked as partner by ${list} — one person can only appear in one couple`,
+        });
+      }
       continue;
     }
     const targetRow = byId.get(target);
@@ -89,7 +96,10 @@ export function validateRows(rows: PersonRow[]): ValidationResult {
     };
     for (const id of byId.keys()) {
       if (visit(id)) {
-        errors.push({ message: `Ancestry cycle detected involving "${id}" — someone is their own ancestor` });
+        const cycleRow = byId.get(id)?.rowNumber;
+        errors.push({
+          message: `Ancestry cycle detected involving "${id}" (row ${cycleRow}) — someone is their own ancestor`,
+        });
         break;
       }
     }

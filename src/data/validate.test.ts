@@ -57,6 +57,12 @@ emma,Emma Ellis,,,david;sarah`);
     const r = v(`${H}\na,Ann,,,b\nb,Bob,,,a`);
     expect(r.errors.some((e) => e.message.toLowerCase().includes('cycle'))).toBe(true);
   });
+
+  it('remarriage shape with 3+ claimants: every claimant is named', () => {
+    const r = v(`${H}\nanna,Anna,,,\nbob,Bob,,anna,\ncarl,Carl,,anna,\ndan,Dan,,anna,`);
+    const err = r.errors.find((e) => e.message.includes('"anna"'));
+    expect(err?.message).toMatch(/bob.*row 3.*carl.*row 4.*dan.*row 5/s);
+  });
 });
 
 describe('validateRows warnings', () => {
