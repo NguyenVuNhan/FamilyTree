@@ -1,0 +1,8 @@
+ID,FullName,Image,PartnerID,ParentIDs
+margaret,Margaret Ellis,https://img.example/margaret.jpg,robert,
+robert,Robert Ellis,,,
+david,David Ellis,,sarah,margaret;robert
+sarah,Sarah Park,,,
+linda,Linda Ellis,,,margaret;robert
+emma,Emma Ellis,,,david;sarah
+noah,Noah Ellis,,,david;sarah

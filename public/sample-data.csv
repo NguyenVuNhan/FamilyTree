@@ -1,0 +1,11 @@
+ID,FullName,Image,PartnerID,ParentIDs
+margaret,Margaret Ellis,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=,robert,
+robert,Robert Ellis,,,
+david,David Ellis,,sarah,margaret;robert
+sarah,Sarah Park,"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",,
+linda,Linda Ellis,,,margaret;robert
+james,James Ellis,,mia,margaret;robert
+mia,Mia Tran,,,
+emma,Emma Ellis,,,david;sarah
+noah,Noah Ellis,,,david;sarah
+lily,Lily Ellis,,,james;mia

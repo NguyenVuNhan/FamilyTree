@@ -1,0 +1,12 @@
+ID,FullName,Image,PartnerID,ParentIDs
+ma,Ma Big,,pa,
+pa,Pa Big,,,
+k0,Kid 0,,,ma;pa
+k1,Kid 1,,,ma;pa
+k2,Kid 2,,,ma;pa
+k3,Kid 3,,,ma;pa
+k4,Kid 4,,,ma;pa
+k5,Kid 5,,,ma;pa
+k6,Kid 6,,,ma;pa
+k7,Kid 7,,,ma;pa
+k8,Kid 8,,,ma;pa
