@@ -43,6 +43,22 @@ jobs:
         run: |
           echo "$VARS_JSON" | jq -r 'to_entries[] | select(.key | startswith("FAMILY_TREE_")) | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
       - run: npm run build
+      # Staging verification (PRs only): serve the freshly built production
+      # artifact under the real Pages base path (/<repo>/) and run the same
+      # smoke suite that later verifies the live deploy — so merge-blocking CI
+      # proves the actual dist/ works, not just the dev servers.
+      - name: Staging smoke against production build (PR)
+        if: github.event_name == 'pull_request'
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          npm run preview -- --port 4173 --strictPort &
+          for i in $(seq 1 30); do
+            curl -sf "http://localhost:4173/$REPO_NAME/" >/dev/null && break
+            [ "$i" = "30" ] && { echo "preview server never became ready"; exit 1; }
+            sleep 1
+          done
+          SMOKE_BASE_URL="http://localhost:4173/$REPO_NAME/" npm run test:smoke
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main'
         with: { path: dist }
