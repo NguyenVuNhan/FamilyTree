@@ -43,12 +43,27 @@ jobs:
         run: |
           echo "$VARS_JSON" | jq -r 'to_entries[] | select(.key | startswith("FAMILY_TREE_")) | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
       - run: npm run build
-      # Staging verification (PRs only): serve the freshly built production
-      # artifact under the real Pages base path (/<repo>/) and run the same
-      # smoke suite that later verifies the live deploy — so merge-blocking CI
-      # proves the actual dist/ works, not just the dev servers.
-      - name: Staging smoke against production build (PR)
-        if: github.event_name == 'pull_request'
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with: { path: dist }
+
+  # Staging verification (PRs only), as its own check so it's visible in the PR
+  # UI: build the real Pages artifact, serve it under the /<repo>/ base path,
+  # and run the same smoke suite that later verifies the live deploy — proving
+  # the actual dist/ works before merge, not just the dev servers.
+  staging-smoke:
+    name: staging-smoke (PR)
+    needs: ci
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Serve production build and run smoke suite
         env:
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
@@ -59,9 +74,6 @@ jobs:
             sleep 1
           done
           SMOKE_BASE_URL="http://localhost:4173/$REPO_NAME/" npm run test:smoke
-      - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
-        with: { path: dist }
 
   deploy:
     needs: ci
@@ -85,6 +97,7 @@ jobs:
         uses: actions/deploy-pages@v4
 
   smoke:
+    name: live-smoke (main, post-deploy)
     needs: deploy
     runs-on: ubuntu-latest
     steps:
