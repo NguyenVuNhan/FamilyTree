@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { defaultDisplayMode, families } from '../config';
 import { resolveFamily } from '../config/families';
 import type { DisplayMode, Issue } from '../data/types';
+import { layoutMetrics } from '../layout/card-metrics';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
+import { DEFAULT_SETTINGS } from '../settings/settings';
 import { ErrorPanel } from './ErrorPanel';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
 import { SampleDataBanner } from './SampleDataBanner';
@@ -42,7 +44,7 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
   }, []);
 
   const layout = useMemo(
-    () => (data.status === 'ready' ? layoutTree(data.model) : null),
+    () => (data.status === 'ready' ? layoutTree(data.model, layoutMetrics(DEFAULT_SETTINGS)) : null),
     [data],
   );
 

@@ -4,9 +4,10 @@ import { TreeCanvas } from './TreeCanvas';
 import { parseCsv } from '../data/csv-parser';
 import { buildModel } from '../data/build-model';
 import { layoutTree } from '../layout/layout-engine';
+import { DEFAULT_METRICS } from '../layout/card-metrics';
 
 const model = buildModel(parseCsv('ID,FullName,Image,PartnerID,ParentIDs\nma,Ma Ellis,,pa,\npa,Pa Ellis,,,\nk,Kid Ellis,,,ma;pa'));
-const layout = layoutTree(model);
+const layout = layoutTree(model, DEFAULT_METRICS);
 
 describe('TreeCanvas', () => {
   it('renders one card per person and one path per connector', () => {
