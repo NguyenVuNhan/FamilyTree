@@ -5,6 +5,7 @@ export interface PersonRow {
   id: string;               // trimmed
   fullName: string;         // trimmed
   image: string;            // raw cell text, '' when blank
+  gender: string;           // raw cell text, '' when blank
   partnerId: string;        // trimmed, '' when blank
   parentIds: string[];      // trimmed, split on ';', empties removed
 }
@@ -13,6 +14,7 @@ export interface Person {
   id: string;
   fullName: string;
   imageSrc?: string;
+  gender?: 'male' | 'female';
 }
 
 export interface Union {

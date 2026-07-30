@@ -63,4 +63,13 @@ aa,Loner A,,,`);
     expect(model.excludedIds).toEqual(['a']);
     expect(model.rootId).toBe('p:z');
   });
+
+  it('carries parsed gender onto Person; unparseable gender is omitted', () => {
+    // a/b/c linked into one family (partner + child) so all three survive the
+    // largest-connected-component filter; only Gender values differ under test.
+    const model = buildModel(parseCsv('ID,FullName,Gender,PartnerID,ParentIDs\na,Ann,f,b,\nb,Bob,,,\nc,Cid,huh,,a;b'));
+    expect(model.persons.get('a')!.gender).toBe('female');
+    expect(model.persons.get('b')!.gender).toBeUndefined();
+    expect(model.persons.get('c')!.gender).toBeUndefined();
+  });
 });

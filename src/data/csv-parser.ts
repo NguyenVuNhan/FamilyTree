@@ -23,6 +23,7 @@ export function parseCsv(text: string): PersonRow[] {
     const id = (raw.id ?? '').trim();
     const fullName = (raw.fullname ?? '').trim();
     const image = (raw.image ?? '').trim();
+    const gender = (raw.gender ?? '').trim();
     const partnerId = (raw.partnerid ?? '').trim();
     const parentIds = (raw.parentids ?? '')
       .split(';')
@@ -30,7 +31,7 @@ export function parseCsv(text: string): PersonRow[] {
       .filter(Boolean);
 
     // Skip fully-empty rows (all fields are empty after trimming)
-    if (!id && !fullName && !image && !partnerId && parentIds.length === 0) {
+    if (!id && !fullName && !image && !partnerId && !gender && parentIds.length === 0) {
       return;
     }
 
@@ -41,6 +42,7 @@ export function parseCsv(text: string): PersonRow[] {
       id,
       fullName,
       image,
+      gender,
       partnerId,
       parentIds,
     });

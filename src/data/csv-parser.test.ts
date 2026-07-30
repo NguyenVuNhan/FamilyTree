@@ -8,7 +8,7 @@ describe('parseCsv', () => {
     const rows = parseCsv(`${HEADER}\nmargaret,Margaret Ellis,,robert,\nrobert,Robert Ellis,,,`);
     expect(rows).toHaveLength(2);
     expect(rows[0]).toEqual({
-      rowNumber: 2, id: 'margaret', fullName: 'Margaret Ellis', image: '', partnerId: 'robert', parentIds: [],
+      rowNumber: 2, id: 'margaret', fullName: 'Margaret Ellis', image: '', gender: '', partnerId: 'robert', parentIds: [],
     });
     expect(rows[1].rowNumber).toBe(3);
   });
@@ -54,5 +54,13 @@ describe('parseCsv', () => {
     expect(rows[0].id).toBe('personA');
     expect(rows[1].rowNumber).toBe(4);
     expect(rows[1].id).toBe('personB');
+  });
+
+  it('parses an optional Gender column, trimmed; absent column yields empty string', () => {
+    const rows = parseCsv('ID,FullName,Gender\na,Ann, F \nb,Bob,');
+    expect(rows[0].gender).toBe('F');
+    expect(rows[1].gender).toBe('');
+    const noCol = parseCsv('ID,FullName\na,Ann');
+    expect(noCol[0].gender).toBe('');
   });
 });
