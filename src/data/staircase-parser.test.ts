@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseStaircase, UnreadableSheetError } from './staircase-parser';
+import { buildModel } from './build-model';
+import { layoutTree, unplacedIds } from '../layout/layout-engine';
 
 describe('parseStaircase — header classification', () => {
   it('parses a single person with a synthesized id and true sheet row number', () => {
@@ -160,5 +162,30 @@ describe('parseStaircase — positional parent resolution', () => {
     const { warnings, rows } = parseStaircase('Đời 1,Image,PartnerImage\nAnn Lee,,https://x.test/b.jpg');
     expect(rows).toHaveLength(1);
     expect(warnings).toEqual([{ row: 2, message: 'Row 2 has a partner image but no partner — the image is ignored' }]);
+  });
+});
+
+describe('parseStaircase — unbounded generation depth', () => {
+  it('25 generation columns parse, build, and lay out with nobody dropped', () => {
+    const N = 25;
+    const header = [...Array.from({ length: N }, (_, i) => `G${i + 1}`), 'Image'].join(',');
+    const lines = Array.from({ length: N }, (_, i) =>
+      Array.from({ length: N + 1 }, (_, c) => (c === i ? `Person ${i + 1}` : '')).join(','),
+    );
+    const { rows, errors } = parseStaircase([header, ...lines].join('\n'));
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(N);
+    expect(rows[N - 1].parentIds).toEqual([`r${N}`]); // sheet row 26's parent is row 25's person
+
+    const model = buildModel(rows);
+    const layout = layoutTree(model);
+    expect(unplacedIds(model, layout)).toEqual([]);
+    expect(layout.cards).toHaveLength(N);
+  });
+
+  it('a generation column to the RIGHT of Image/PartnerImage is still the next-deeper generation', () => {
+    const { rows, errors } = parseStaircase('Đời 1,Image,Đời 2\nAnn Lee,,\n,,Kid One');
+    expect(errors).toEqual([]);
+    expect(rows[1]).toEqual(expect.objectContaining({ id: 'r3', fullName: 'Kid One', parentIds: ['r2'] }));
   });
 });
