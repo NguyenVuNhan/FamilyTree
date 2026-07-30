@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DEMO_KEY, type Family } from '../config/families';
 import type { FamilyModel, Issue } from '../data/types';
-import { parseCsv, UnreadableCsvError } from '../data/csv-parser';
+import { parseStaircase, UnreadableSheetError } from '../data/staircase-parser';
 import { validateRows } from '../data/validate';
 import { buildModel } from '../data/build-model';
 import { families } from '../config';
@@ -13,13 +13,18 @@ export type DataState =
   | { status: 'empty' };
 
 function process(text: string): DataState {
-  const rows = parseCsv(text);
-  if (rows.length === 0) return { status: 'empty' };
-  const { errors, warnings } = validateRows(rows);
+  const { rows, errors, warnings: parseWarnings } = parseStaircase(text);
   if (errors.length > 0) return { status: 'invalid', errors };
+  if (rows.length === 0) return { status: 'empty' };
+  const { warnings: imageWarnings } = validateRows(rows);
+  const warnings = [...parseWarnings, ...imageWarnings];
   const model = buildModel(rows);
   if (model.excludedIds.length > 0) {
-    warnings.push({ message: `Not connected to the main family and not shown: ${model.excludedIds.join(', ')}` });
+    // synthetic ids (r5, r5p) must never reach the user — list display names
+    const nameOf = new Map(rows.map((r) => [r.id, r.fullName]));
+    warnings.push({
+      message: `Not connected to the main family and not shown: ${model.excludedIds.map((id) => nameOf.get(id) ?? id).join(', ')}`,
+    });
   }
   return { status: 'ready', model, warnings, source: 'live' };
 }
@@ -41,7 +46,7 @@ export function useFamilyData(family: Family, isOnlyDemo: boolean): DataState {
         }
         return done(result);
       } catch (e) {
-        reason = e instanceof UnreadableCsvError ? 'unreadable' : 'load-failed';
+        reason = e instanceof UnreadableSheetError ? 'unreadable' : 'load-failed';
       }
       try {
         const demoUrl = families.find((f) => f.key === DEMO_KEY)!.csvUrl; // demo always exists

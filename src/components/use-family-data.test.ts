@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import type { Issue } from '../data/types';
 import { useFamilyData } from './use-family-data';
 
-const CSV = 'ID,FullName,Image,PartnerID,ParentIDs\na,Ann,,b,\nb,Bob,,,';
-const DEMO_CSV = 'ID,FullName,Image,PartnerID,ParentIDs\nd,Demo Person,,,';
+const CSV = 'Đời 1,Image\nAnn + Bob,';
+const DEMO_CSV = 'Đời 1,Image\nDemo Person,';
 const live = { key: 'alpha', displayName: 'Alpha', csvUrl: 'https://sheets.example/a.csv' };
 const demo = { key: 'demo', displayName: 'Demo Family', csvUrl: '/sample-data.csv' };
 
@@ -25,14 +26,14 @@ describe('useFamilyData', () => {
     expect(result.current).toMatchObject({ source: 'live' });
   });
 
-  it('validation errors → invalid with issues', async () => {
-    mockFetch({ [live.csvUrl]: { ok: true, body: 'ID,FullName\na,' } });
+  it('structural errors → invalid with issues', async () => {
+    mockFetch({ [live.csvUrl]: { ok: true, body: 'Đời 1,Đời 2,Image\n,Orphan Kid,' } });
     const { result } = renderHook(() => useFamilyData(live, false));
     await waitFor(() => expect(result.current.status).toBe('invalid'));
   });
 
   it('header-only CSV → empty', async () => {
-    mockFetch({ [live.csvUrl]: { ok: true, body: 'ID,FullName,Image,PartnerID,ParentIDs' } });
+    mockFetch({ [live.csvUrl]: { ok: true, body: 'Đời 1,Đời 2,Image' } });
     const { result } = renderHook(() => useFamilyData(live, false));
     await waitFor(() => expect(result.current.status).toBe('empty'));
   });
@@ -62,5 +63,14 @@ describe('useFamilyData', () => {
     const b = renderHook(() => useFamilyData(demo, false));
     await waitFor(() => expect(b.result.current.status).toBe('ready'));
     expect(b.result.current).toMatchObject({ source: 'live' });
+  });
+
+  it('excluded-component warning lists display names, never synthetic ids', async () => {
+    mockFetch({ [live.csvUrl]: { ok: true, body: 'Đời 1,Đời 2,Image\nAnn + Bob,,\n,Kid One,\nLoner Sue,,' } });
+    const { result } = renderHook(() => useFamilyData(live, false));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const { warnings } = result.current as { warnings: Issue[] };
+    expect(warnings.some((w) => w.message.includes('Loner Sue'))).toBe(true);
+    expect(warnings.some((w) => /\br\d+p?\b/.test(w.message))).toBe(false);
   });
 });

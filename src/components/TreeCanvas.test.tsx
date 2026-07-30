@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TreeCanvas } from './TreeCanvas';
-import { parseCsv } from '../data/csv-parser';
+import { parseStaircase } from '../data/staircase-parser';
 import { buildModel } from '../data/build-model';
 import { layoutTree } from '../layout/layout-engine';
 
-const model = buildModel(parseCsv('ID,FullName,Image,PartnerID,ParentIDs\nma,Ma Ellis,,pa,\npa,Pa Ellis,,,\nk,Kid Ellis,,,ma;pa'));
+const model = buildModel(parseStaircase('Đời 1,Đời 2,Image\nMa Ellis + Pa Ellis,,\n,Kid Ellis,').rows);
 const layout = layoutTree(model);
 
 describe('TreeCanvas', () => {
@@ -16,9 +16,9 @@ describe('TreeCanvas', () => {
   });
 
   it('marks only the expanded card', () => {
-    render(<TreeCanvas model={model} layout={layout} mode="name" expandedId="pa" onToggle={() => {}} />);
+    render(<TreeCanvas model={model} layout={layout} mode="name" expandedId="r2p" onToggle={() => {}} />);
     const expanded = screen.getAllByRole('button').filter((b) => b.dataset.expanded === 'true');
     expect(expanded).toHaveLength(1);
-    expect(expanded[0].dataset.personId).toBe('pa');
+    expect(expanded[0].dataset.personId).toBe('r2p');
   });
 });
