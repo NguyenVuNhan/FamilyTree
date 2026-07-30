@@ -67,7 +67,7 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
     if (data.status !== 'ready' || !layout) return [];
     const missing = unplacedIds(data.model, layout);
     return missing.length > 0
-      ? [...data.warnings, { message: `In this version, relatives connected only through an in-law are not shown: ${missing.join(', ')}` }]
+      ? [...data.warnings, { message: `In this version, relatives connected only through an in-law are not shown: ${missing.map((id) => data.model.persons.get(id)?.fullName ?? id).join(', ')}` }]
       : data.warnings;
   }, [data, layout]);
 

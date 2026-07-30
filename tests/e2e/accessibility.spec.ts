@@ -5,7 +5,7 @@ test('E2E-10: keyboard-only walkthrough (UC-11)', async ({ page }) => {
   await page.route('https://img.example/**', (r) => r.abort()); // avatar fallback path is fine
   await serveCsv(page, { fixtureName: 'standard.csv' });
   await page.goto('/?family=alpha');
-  await expect(card(page, 'margaret')).toBeVisible();
+  await expect(card(page, 'r2')).toBeVisible();
 
   // Tab until a person card is focused, then Enter expands, Esc collapses
   for (let i = 0; i < 20; i++) {
@@ -26,7 +26,7 @@ test('E2E-10: keyboard-only walkthrough (UC-11)', async ({ page }) => {
   await page.getByRole('button', { name: 'Layout settings' }).click();
   await page.getByTestId('settings-panel').getByRole('button', { name: 'Name', exact: true }).focus();
   await page.keyboard.press('Enter');
-  await expect(card(page, 'robert').getByText('Robert Ellis')).toBeVisible();
+  await expect(card(page, 'r2p').getByText('Robert Ellis')).toBeVisible();
 });
 
 test.describe('E2E-11: mobile viewport (UC-12) — pinch stays manual', () => {
@@ -40,8 +40,8 @@ test.describe('E2E-11: mobile viewport (UC-12) — pinch stays manual', () => {
     await serveCsv(page, { fixtureName: 'standard.csv' });
     await page.goto('/?family=alpha');
     await expect(page.locator('.toolbar')).toBeVisible();
-    await card(page, 'robert').tap();
-    await expect(card(page, 'robert')).toHaveAttribute('data-expanded', 'true');
+    await card(page, 'r2p').tap();
+    await expect(card(page, 'r2p')).toHaveAttribute('data-expanded', 'true');
     const before = await page.getByTestId('viewport-transform').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).e);
     const vp = (await page.getByTestId('viewport').boundingBox())!;
     await page.touchscreen.tap(vp.x + 10, vp.y + 10); // background tap collapses

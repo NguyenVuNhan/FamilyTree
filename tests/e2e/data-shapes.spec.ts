@@ -64,10 +64,10 @@ test('E2E-16: 9 siblings — no overlapping cards, parents centered (UC-17)', as
   // Both midpoints are derived from the single `boxes` snapshot above (not fresh
   // boundingBox() calls) — separate round-trips raced the fit-to-view transform
   // settling and produced spurious ~100px+ diffs under repeated/parallel runs.
-  const maBox = boxes.find((b) => b.id === 'ma')!;
-  const paBox = boxes.find((b) => b.id === 'pa')!;
+  const maBox = boxes.find((b) => b.id === 'r2')!;
+  const paBox = boxes.find((b) => b.id === 'r2p')!;
   const parentMid = ((maBox.x + maBox.w / 2) + (paBox.x + paBox.w / 2)) / 2;
-  const childBoxes = boxes.filter((b) => /^k\d$/.test(b.id ?? ''));
+  const childBoxes = boxes.filter((b) => b.id !== 'r2' && b.id !== 'r2p');
   expect(childBoxes).toHaveLength(9);
   const spanLeft = Math.min(...childBoxes.map((b) => b.x));
   const spanRight = Math.max(...childBoxes.map((b) => b.x + b.w));
@@ -77,7 +77,7 @@ test('E2E-16: 9 siblings — no overlapping cards, parents centered (UC-17)', as
 
 test('E2E-17: disconnected family — largest renders, notice lists excluded ids (UC-19)', async ({ page }) => {
   await open(page, 'disconnected.csv');
-  await expect(card(page, 'x1')).toHaveCount(0);
-  await expect(page.getByTestId('warnings')).toContainText('x1');
-  await expect(page.getByTestId('warnings')).toContainText('x2');
+  await expect(card(page, 'r5')).toHaveCount(0);
+  await expect(page.getByTestId('warnings')).toContainText('Lost One');
+  await expect(page.getByTestId('warnings')).toContainText('Lost Two');
 });

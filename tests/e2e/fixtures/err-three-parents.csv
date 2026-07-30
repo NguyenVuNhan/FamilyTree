@@ -1,5 +1,0 @@
-ID,FullName,Image,PartnerID,ParentIDs
-a,Ann,,,
-b,Bob,,,
-c,Cid,,,
-k,Kid,,,a;b;c

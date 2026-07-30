@@ -16,8 +16,8 @@ test('E2E-01: standard fixture renders everyone, connectors, centered (UC-1, UC-
   // which emits one marriage line per 2-partner union plus one elbow drop per direct child)
   await expect(page.getByTestId('connector-layer').locator('path')).toHaveCount(6);
   // married child (david+sarah couple) and single child (linda) share generation row
-  const davidBox = (await card(page, 'david').boundingBox())!;
-  const lindaBox = (await card(page, 'linda').boundingBox())!;
+  const davidBox = (await card(page, 'r3').boundingBox())!;
+  const lindaBox = (await card(page, 'r6').boundingBox())!;
   expect(Math.abs(davidBox.y - lindaBox.y)).toBeLessThan(2);
   // tree is fitted inside the viewport
   const vp = (await page.getByTestId('viewport').boundingBox())!;

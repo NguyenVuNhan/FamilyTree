@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCsv } from '../data/csv-parser';
+import type { PersonRow } from '../data/types';
 import { buildModel } from '../data/build-model';
 import { layoutTree, unplacedIds } from './layout-engine';
 import { DEFAULT_METRICS } from './card-metrics';
@@ -13,13 +13,18 @@ const {
   margin: MARGIN,
 } = DEFAULT_METRICS;
 
-const H = 'ID,FullName,Image,PartnerID,ParentIDs';
-const lay = (csv: string) => layoutTree(buildModel(parseCsv(csv)), DEFAULT_METRICS);
+// Layout is format-agnostic: build PersonRow[] directly. (Some shapes below —
+// multi-root in-laws, cousins marrying — are deliberately inexpressible in the
+// staircase sheet format but must keep working at the model/layout level.)
+const P = (rowNumber: number, id: string, o: Partial<PersonRow> = {}): PersonRow => ({
+  rowNumber, id, fullName: id.toUpperCase(), image: '', gender: '', partnerId: '', parentIds: [], ...o,
+});
+const lay = (rows: PersonRow[]) => layoutTree(buildModel(rows), DEFAULT_METRICS);
 const card = (r: ReturnType<typeof lay>, id: string) => r.cards.find((c) => c.personId === id)!;
 
 describe('layoutTree', () => {
   it('single person: one centered card, no connectors', () => {
-    const r = lay(`${H}\na,Ann,,,`);
+    const r = lay([P(2, 'a')]);
     expect(r.cards).toEqual([{ personId: 'a', x: MARGIN, y: MARGIN }]);
     expect(r.connectors).toEqual([]);
     expect(r.width).toBe(CARD_W + 2 * MARGIN);
@@ -27,7 +32,7 @@ describe('layoutTree', () => {
   });
 
   it('couple: partners side by side with one marriage line', () => {
-    const r = lay(`${H}\na,Ann,,b,\nb,Bob,,,`);
+    const r = lay([P(2, 'a', { partnerId: 'b' }), P(3, 'b')]);
     expect(card(r, 'a').x).toBe(MARGIN);
     expect(card(r, 'b').x).toBe(MARGIN + CARD_W + COUPLE_GAP);
     expect(card(r, 'a').y).toBe(card(r, 'b').y);
@@ -35,7 +40,10 @@ describe('layoutTree', () => {
   });
 
   it('parents are centered above their children span', () => {
-    const r = lay(`${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa\nk2,K2,,,ma;pa`);
+    const r = lay([
+      P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'),
+      P(4, 'k1', { parentIds: ['ma', 'pa'] }), P(5, 'k2', { parentIds: ['ma', 'pa'] }),
+    ]);
     const coupleCenter = (card(r, 'ma').x + card(r, 'pa').x + CARD_W) / 2;
     const childrenCenter = (card(r, 'k1').x + card(r, 'k2').x + CARD_W) / 2;
     expect(coupleCenter).toBeCloseTo(childrenCenter);
@@ -43,29 +51,38 @@ describe('layoutTree', () => {
   });
 
   it('sibling subtrees do not overlap (9 children)', () => {
-    const kids = Array.from({ length: 9 }, (_, i) => `k${i},Kid ${i},,,ma;pa`).join('\n');
-    const r = lay(`${H}\nma,Ma,,pa,\npa,Pa,,,\n${kids}`);
+    const kids = Array.from({ length: 9 }, (_, i) => P(4 + i, `k${i}`, { parentIds: ['ma', 'pa'] }));
+    const r = lay([P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'), ...kids]);
     const xs = r.cards.filter((c) => c.personId.startsWith('k')).map((c) => c.x).sort((a, b) => a - b);
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(CARD_W + SIBLING_GAP);
   });
 
   it('married child brings the in-law into the same generation row', () => {
-    const r = lay(`${H}\nma,Ma,,pa,\npa,Pa,,,\nson,Son,,wife,ma;pa\nwife,Wife,,,`);
+    const r = lay([
+      P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'),
+      P(4, 'son', { partnerId: 'wife', parentIds: ['ma', 'pa'] }), P(5, 'wife'),
+    ]);
     expect(card(r, 'wife').y).toBe(card(r, 'son').y);
   });
 
   it('4-generation chain stacks generations', () => {
-    const r = lay(`${H}\ng1,G1,,,\ng2,G2,,,g1\ng3,G3,,,g2\ng4,G4,,,g3`);
+    const r = lay([
+      P(2, 'g1'), P(3, 'g2', { parentIds: ['g1'] }),
+      P(4, 'g3', { parentIds: ['g2'] }), P(5, 'g4', { parentIds: ['g3'] }),
+    ]);
     expect(card(r, 'g4').y - card(r, 'g1').y).toBe(3 * (CARD_H + GEN_GAP));
   });
 
   it('connector count: couple with 2 children = marriage + 2 drops', () => {
-    const r = lay(`${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa\nk2,K2,,,ma;pa`);
+    const r = lay([
+      P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'),
+      P(4, 'k1', { parentIds: ['ma', 'pa'] }), P(5, 'k2', { parentIds: ['ma', 'pa'] }),
+    ]);
     expect(r.connectors).toHaveLength(3);
   });
 
   it('all coordinates are inside the reported canvas', () => {
-    const r = lay(`${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa`);
+    const r = lay([P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'), P(4, 'k1', { parentIds: ['ma', 'pa'] })]);
     for (const c of r.cards) {
       expect(c.x).toBeGreaterThanOrEqual(0);
       expect(c.x + CARD_W).toBeLessThanOrEqual(r.width);
@@ -78,16 +95,15 @@ describe('multi-root sheets (a rendered child\'s spouse\'s parents are also pres
   // ra+rb is the root union (son's parents). son marries wife; wife's own parents
   // (fa+mo) are a second root-candidate union in the same connected component, but
   // the single-root tree walk never reaches them from ra+rb's side.
-  const CSV = `${H}
-ra,Ra,,rb,
-rb,Rb,,,
-son,Son,,wife,ra;rb
-fa,Fa,,mo,
-mo,Mo,,,
-wife,Wife,,,fa;mo`;
+  const ROWS = [
+    P(2, 'ra', { partnerId: 'rb' }), P(3, 'rb'),
+    P(4, 'son', { partnerId: 'wife', parentIds: ['ra', 'rb'] }),
+    P(5, 'fa', { partnerId: 'mo' }), P(6, 'mo'),
+    P(7, 'wife', { parentIds: ['fa', 'mo'] }),
+  ];
 
   it('the orphaned in-laws never get a card', () => {
-    const model = buildModel(parseCsv(CSV));
+    const model = buildModel(ROWS);
     const layout = layoutTree(model, DEFAULT_METRICS);
     const ids = layout.cards.map((c) => c.personId);
     expect(ids).not.toContain('fa');
@@ -95,33 +111,30 @@ wife,Wife,,,fa;mo`;
   });
 
   it('unplacedIds reports exactly the orphaned in-laws', () => {
-    const model = buildModel(parseCsv(CSV));
+    const model = buildModel(ROWS);
     const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual(['fa', 'mo']);
   });
 
   it('unplacedIds is empty for an ordinary well-formed tree', () => {
-    const model = buildModel(parseCsv(`${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa`));
+    const model = buildModel([P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'), P(4, 'k1', { parentIds: ['ma', 'pa'] })]);
     const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual([]);
   });
 });
 
 describe('two rendered children marrying each other (dedupes the shared union)', () => {
-  // g1+g2 is root, with children m and f. m marries x (child: a); f marries y (child:
-  // b). a and b — each a rendered grandchild from a different branch — marry each other.
-  const CSV = `${H}
-g1,G1,,g2,
-g2,G2,,,
-m,M,,x,g1;g2
-f,F,,y,g1;g2
-x,X,,,
-y,Y,,,
-a,A,,b,m;x
-b,B,,,f;y`;
+  const ROWS = [
+    P(2, 'g1', { partnerId: 'g2' }), P(3, 'g2'),
+    P(4, 'm', { partnerId: 'x', parentIds: ['g1', 'g2'] }),
+    P(5, 'f', { partnerId: 'y', parentIds: ['g1', 'g2'] }),
+    P(6, 'x'), P(7, 'y'),
+    P(8, 'a', { partnerId: 'b', parentIds: ['m', 'x'] }),
+    P(9, 'b', { parentIds: ['f', 'y'] }),
+  ];
 
   it('every person appears exactly once in layout.cards (no duplicate keys)', () => {
-    const model = buildModel(parseCsv(CSV));
+    const model = buildModel(ROWS);
     const layout = layoutTree(model, DEFAULT_METRICS);
     const ids = layout.cards.map((c) => c.personId);
     const counts = new Map<string, number>();
@@ -131,7 +144,7 @@ b,B,,,f;y`;
   });
 
   it('nothing is left unplaced — the shared union is rendered once, not dropped', () => {
-    const model = buildModel(parseCsv(CSV));
+    const model = buildModel(ROWS);
     const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual([]);
   });
@@ -139,23 +152,25 @@ b,B,,,f;y`;
 
 describe('metrics parameterization', () => {
   it('a larger generation gap moves children further down', () => {
-    const csv = `${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa`;
-    const wide = layoutTree(buildModel(parseCsv(csv)), { ...DEFAULT_METRICS, genGap: 200 });
-    const base = layoutTree(buildModel(parseCsv(csv)), DEFAULT_METRICS);
+    const rows = () => [P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'), P(4, 'k1', { parentIds: ['ma', 'pa'] })];
+    const wide = layoutTree(buildModel(rows()), { ...DEFAULT_METRICS, genGap: 200 });
+    const base = layoutTree(buildModel(rows()), DEFAULT_METRICS);
     const kY = (r: typeof base) => r.cards.find((c) => c.personId === 'k1')!.y;
     expect(kY(wide) - kY(base)).toBe(200 - DEFAULT_METRICS.genGap);
   });
 
   it('a larger sibling gap widens the canvas', () => {
-    const csv = `${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa\nk2,K2,,,ma;pa\nk3,K3,,,ma;pa`;
-    const wide = layoutTree(buildModel(parseCsv(csv)), { ...DEFAULT_METRICS, siblingGap: 100 });
-    const base = layoutTree(buildModel(parseCsv(csv)), DEFAULT_METRICS);
+    const rows = () => [
+      P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'),
+      P(4, 'k1', { parentIds: ['ma', 'pa'] }), P(5, 'k2', { parentIds: ['ma', 'pa'] }), P(6, 'k3', { parentIds: ['ma', 'pa'] }),
+    ];
+    const wide = layoutTree(buildModel(rows()), { ...DEFAULT_METRICS, siblingGap: 100 });
+    const base = layoutTree(buildModel(rows()), DEFAULT_METRICS);
     expect(wide.width).toBe(base.width + 2 * (100 - DEFAULT_METRICS.siblingGap));
   });
 
   it('connector style flows through to path generation', () => {
-    const csv = `${H}\nma,Ma,,,\nk1,K1,,,ma`;
-    const straight = layoutTree(buildModel(parseCsv(csv)), { ...DEFAULT_METRICS, connectorStyle: 'straight' });
+    const straight = layoutTree(buildModel([P(2, 'ma'), P(3, 'k1', { parentIds: ['ma'] })]), { ...DEFAULT_METRICS, connectorStyle: 'straight' });
     for (const d of straight.connectors) expect(d).not.toContain('Q'); // no elbow arcs
   });
 });
