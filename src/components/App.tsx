@@ -30,10 +30,11 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
   const family = families.find((f) => f.key === familyKey)!;
   const isOnlyDemo = families.length === 1;
   const data = useFamilyData(family, isOnlyDemo);
-  const [settings, setSettings] = useState(() => loadSettings(family.key));
+  const [settings] = useState(() => loadSettings(family.key));
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [scalePct, setScalePct] = useState(100);
+  const [panelOpen, setPanelOpen] = useState(false);
   const viewport = useRef<ViewportApi | null>(null);
 
   useEffect(() => { document.title = `${family.displayName} — Family Tree`; }, [family.displayName]);
@@ -78,13 +79,13 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
     <div className="app">
       <Toolbar
         title={family.displayName}
-        mode={settings.contentMode === 'name' ? 'name' : 'photo'}
-        onMode={(m) => setSettings({ ...settings, contentMode: m === 'name' ? 'name' : 'avatar' })}
         scalePct={scalePct}
         onZoomIn={() => viewport.current?.zoomIn()}
         onZoomOut={() => viewport.current?.zoomOut()}
         onFit={() => viewport.current?.fit()}
         onPrint={() => window.print()}
+        settingsOpen={panelOpen}
+        onToggleSettings={() => setPanelOpen((o) => !o)}
       />
       {data.source === 'fallback' && !bannerDismissed && data.fallbackReason && (
         <SampleDataBanner reason={data.fallbackReason} onDismiss={() => setBannerDismissed(true)} />
