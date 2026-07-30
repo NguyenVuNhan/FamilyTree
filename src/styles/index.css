@@ -69,6 +69,7 @@ body { background: #f6f7f9; color: #1a202c; }
   .viewport { overflow: visible; background-image: none; }
   .viewport-transform { transform: scale(var(--print-scale, 1)) !important; }
   .connector { stroke: #6b7280; }
-  .person-card, .person-card:hover { box-shadow: none; transform: none; }
+  .person-card, .person-card:hover { box-shadow: none; transform: none; border-color: #6b7280; }
+  .avatar-fallback { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #fff; }
 }
