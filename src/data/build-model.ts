@@ -14,7 +14,7 @@ export function buildModel(rows: PersonRow[]): FamilyModel {
     });
   }
 
-  // collect unions from explicit partners and from ParentIDs pairs
+  // collect unions from explicit partners and from parentIds pairs
   const unions = new Map<string, Union>();
   const ensureUnion = (partners: string[]) => {
     const id = unionId(partners);

@@ -17,7 +17,7 @@ describe('buildModel', () => {
     expect(model.persons.get('b')).toEqual({ id: 'b', fullName: 'Bob' });
   });
 
-  it('couple + children from PartnerID and ParentIDs', () => {
+  it('couple + children from partnerId and parentIds', () => {
     const model = buildModel([
       P(2, 'ma', { fullName: 'Ma', partnerId: 'pa' }),
       P(3, 'pa', { fullName: 'Pa' }),
@@ -27,7 +27,7 @@ describe('buildModel', () => {
     expect(model.rootId).toBe('u:ma+pa');
   });
 
-  it('ParentIDs pair implicitly forms a union without PartnerID', () => {
+  it('parentIds pair implicitly forms a union without partnerId', () => {
     const model = buildModel([
       P(2, 'ma', { fullName: 'Ma' }),
       P(3, 'pa', { fullName: 'Pa' }),

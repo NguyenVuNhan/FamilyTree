@@ -16,7 +16,7 @@ function process(text: string): DataState {
   const { rows, errors, warnings: parseWarnings } = parseStaircase(text);
   if (errors.length > 0) return { status: 'invalid', errors };
   if (rows.length === 0) return { status: 'empty' };
-  const { warnings: imageWarnings } = validateRows(rows);
+  const imageWarnings = validateRows(rows);
   const warnings = [...parseWarnings, ...imageWarnings];
   const model = buildModel(rows);
   if (model.excludedIds.length > 0) {

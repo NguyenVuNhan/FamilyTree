@@ -27,6 +27,8 @@ Rules:
 
 Mistakes (a row in two columns, a child more than one step deeper than its parent) show a friendly error on the page with the exact row number — fix the sheet and refresh.
 
+**Migrating an older sheet:** sheets using the previous ID-based format (`ID` / `FullName` / `PartnerID` / `ParentIDs` columns) no longer work and must be converted to the staircase layout above. Until converted, the page shows a sheet error (or falls back to the built-in demo data).
+
 ### Publishing your sheet
 
 1. In Google Sheets: **File → Share → Publish to web**, format **CSV**.

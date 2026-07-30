@@ -1,15 +1,10 @@
 import type { Issue, PersonRow } from './types';
 import { resolveImage } from './image-source';
 
-export interface ValidationResult {
-  errors: Issue[];
-  warnings: Issue[];
-}
-
 // Structural validation lives in the staircase parser — the positional format
 // cannot express reference mistakes (unknown ids, cycles, conflicting unions),
 // so all that remains here is per-person image-value checking.
-export function validateRows(rows: PersonRow[]): ValidationResult {
+export function validateRows(rows: PersonRow[]): Issue[] {
   const warnings: Issue[] = [];
   for (const row of rows) {
     if (resolveImage(row.image).kind === 'invalid') {
@@ -19,5 +14,5 @@ export function validateRows(rows: PersonRow[]): ValidationResult {
       });
     }
   }
-  return { errors: [], warnings };
+  return warnings;
 }

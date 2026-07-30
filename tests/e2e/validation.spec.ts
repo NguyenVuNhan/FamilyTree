@@ -24,10 +24,10 @@ test('E2E-19: header-only sheet → friendly empty state (UC-22)', async ({ page
   await expect(page.getByTestId('empty-state')).toContainText(/no people found/i);
 });
 
-// Adaptation (documented in task-14-report.md): a zero-byte sheet has no parseable header row,
-// so parseStaircase() throws UnreadableSheetError — indistinguishable, by design, from any other
-// unreadable payload (HTML error page, wrong columns). useFamilyData() catches that and falls
-// back to the bundled sample data, showing the "couldn't be read" banner, NOT the empty-state.
+// Adaptation: a zero-byte sheet has no parseable header row, so parseStaircase() throws
+// UnreadableSheetError — indistinguishable, by design, from any other unreadable payload
+// (HTML error page, wrong columns). useFamilyData() catches that and falls back to the
+// bundled sample data, showing the "couldn't be read" banner, NOT the empty-state.
 // Only a sheet with a valid header and zero data rows (header-only.csv, above) reaches 'empty'.
 test('E2E-19b: zero-byte sheet is unreadable (no header row) — falls back to sample data', async ({ page }) => {
   await serveCsv(page, { fixtureName: 'empty.csv' });
