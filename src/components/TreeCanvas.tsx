@@ -1,13 +1,14 @@
 import { memo } from 'react';
-import type { DisplayMode, FamilyModel } from '../data/types';
+import type { FamilyModel } from '../data/types';
 import type { LayoutResult } from '../layout/layout-engine';
+import type { LayoutSettings } from '../settings/settings';
 import { PersonCard } from './PersonCard';
 
 // Memoized: the viewport re-renders on every pan/zoom tick, but the tree's own props
-// (model/layout/mode/expandedId) rarely change on those ticks — memo skips re-rendering
+// (model/layout/settings/expandedId) rarely change on those ticks — memo skips re-rendering
 // (and re-diffing) every card in the tree for a plain pan or zoom.
-export const TreeCanvas = memo(function TreeCanvas({ model, layout, mode, expandedId, onToggle }: {
-  model: FamilyModel; layout: LayoutResult; mode: DisplayMode;
+export const TreeCanvas = memo(function TreeCanvas({ model, layout, settings, expandedId, onToggle }: {
+  model: FamilyModel; layout: LayoutResult; settings: LayoutSettings;
   expandedId: string | null; onToggle: (id: string) => void;
 }) {
   return (
@@ -20,7 +21,7 @@ export const TreeCanvas = memo(function TreeCanvas({ model, layout, mode, expand
       {layout.cards.map((c) => {
         const person = model.persons.get(c.personId)!;
         return (
-          <PersonCard key={c.personId} person={person} mode={mode}
+          <PersonCard key={c.personId} person={person} settings={settings}
             expanded={expandedId === c.personId} x={c.x} y={c.y} onToggle={onToggle} />
         );
       })}

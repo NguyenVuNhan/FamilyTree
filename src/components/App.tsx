@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { defaultDisplayMode, families } from '../config';
+import { families } from '../config';
 import { resolveFamily } from '../config/families';
-import type { DisplayMode, Issue } from '../data/types';
+import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
-import { DEFAULT_SETTINGS } from '../settings/settings';
+import { loadSettings } from '../settings/settings';
 import { ErrorPanel } from './ErrorPanel';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
 import { SampleDataBanner } from './SampleDataBanner';
@@ -30,7 +30,7 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
   const family = families.find((f) => f.key === familyKey)!;
   const isOnlyDemo = families.length === 1;
   const data = useFamilyData(family, isOnlyDemo);
-  const [mode, setMode] = useState<DisplayMode>(defaultDisplayMode);
+  const [settings, setSettings] = useState(() => loadSettings(family.key));
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [scalePct, setScalePct] = useState(100);
@@ -44,8 +44,8 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
   }, []);
 
   const layout = useMemo(
-    () => (data.status === 'ready' ? layoutTree(data.model, layoutMetrics(DEFAULT_SETTINGS)) : null),
-    [data],
+    () => (data.status === 'ready' ? layoutTree(data.model, layoutMetrics(settings)) : null),
+    [data, settings],
   );
 
   // Never a silently wrong tree (spec §6): if the single-root layout walk couldn't
@@ -78,8 +78,8 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
     <div className="app">
       <Toolbar
         title={family.displayName}
-        mode={mode}
-        onMode={setMode}
+        mode={settings.contentMode === 'name' ? 'name' : 'photo'}
+        onMode={(m) => setSettings({ ...settings, contentMode: m === 'name' ? 'name' : 'avatar' })}
         scalePct={scalePct}
         onZoomIn={() => viewport.current?.zoomIn()}
         onZoomOut={() => viewport.current?.zoomOut()}
@@ -100,7 +100,7 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
         viewportRef={viewport}
         onScaleChange={setScalePct}
       >
-        <TreeCanvas model={data.model} layout={layout!} mode={mode}
+        <TreeCanvas model={data.model} layout={layout!} settings={settings}
           expandedId={expandedId} onToggle={(id) => setExpandedId((cur) => (cur === id ? null : id))} />
       </PanZoomViewport>
     </div>
