@@ -30,6 +30,11 @@ describe('Avatar', () => {
     rerender(<Avatar person={{ id: 'b', fullName: 'Bob Smith', imageSrc: 'https://x.test/valid.jpg' }} size={52} />);
     expect(screen.getByRole('img', { name: 'Bob Smith' })).toHaveAttribute('src', 'https://x.test/valid.jpg');
   });
+
+  it('marks the fallback with avatar-fallback so print CSS can force colors', () => {
+    render(<Avatar person={{ id: 'a', fullName: 'Ann Lee' }} size={52} />);
+    expect(screen.getByRole('img', { name: 'Ann Lee' })).toHaveClass('avatar-fallback');
+  });
 });
 
 describe('illustrated placeholders', () => {

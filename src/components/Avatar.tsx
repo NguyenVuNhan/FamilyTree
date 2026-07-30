@@ -15,7 +15,7 @@ function Silhouette({ gender, hue, size, shape, label }: {
       width={size}
       height={size}
       viewBox="0 0 64 64"
-      className={shape === 'circle' ? 'rounded-full' : ''}
+      className={shape === 'circle' ? 'avatar-fallback rounded-full' : 'avatar-fallback'}
       style={{ background: `hsl(${hue} 45% 90%)`, flexShrink: 0 }}
     >
       {gender === 'female' ? (
@@ -63,7 +63,7 @@ export function Avatar({ person, size, shape = 'circle', placeholderStyle = 'ini
     <div
       role="img"
       aria-label={person.fullName}
-      className={`flex items-center justify-center ${round} font-semibold text-white select-none`.trim()}
+      className={`avatar-fallback flex items-center justify-center ${round} font-semibold text-white select-none`.trim()}
       style={{
         width: size,
         height: size,
