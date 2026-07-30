@@ -26,8 +26,8 @@ export function PersonCard({ person, settings, expanded, x, y, onToggle }: {
       onClick={() => onToggle(person.id)}
       className={`person-card style-${style}${expanded ? ' expanded' : ''}`}
       style={{
-        left: x, top: y, width: cardW, height: cardH,
-        padding: bleeds && !expanded ? 0 : settings.cardPadding,
+        left: x, top: y, width: cardW,
+        ...(expanded ? { minHeight: cardH } : { height: cardH, padding: bleeds ? 0 : settings.cardPadding }),
         '--pad': `${settings.cardPadding}px`,
         '--ring-color': `hsl(${avatarHue(person.id)} 45% 62%)`,
       } as CSSProperties}
