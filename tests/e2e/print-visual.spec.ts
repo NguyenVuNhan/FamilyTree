@@ -25,3 +25,12 @@ test('E2E-29: visual regression at fit-to-view (UC-1) — local guard, CI ignore
   await expect(page.locator('.person-card')).toHaveCount(7);
   await expect(page).toHaveScreenshot('tree-standard.png', { maxDiffPixelRatio: 0.02 });
 });
+
+test('E2E-30: print visual regression (UC-4) — local guard, CI ignores snapshots', async ({ page }) => {
+  await serveCsv(page, { fixtureName: 'standard.csv' });
+  await page.route('https://img.example/**', (r) => r.abort());
+  await page.goto('/?family=alpha');
+  await expect(page.locator('.person-card')).toHaveCount(7);
+  await page.emulateMedia({ media: 'print' });
+  await expect(page).toHaveScreenshot('tree-standard-print.png', { maxDiffPixelRatio: 0.02 });
+});
