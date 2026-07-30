@@ -15,6 +15,14 @@ One row per person; row order is irrelevant.
 | `Image` | no | URL / base64 | Blank → initials avatar |
 | `PartnerID` | no | `robert` | Links spouses; filling it on one of the two rows suffices |
 | `ParentIDs` | no | `margaret;robert` | 1–2 ids separated by `;` — attaches this person as a child of that couple/parent |
+| `Gender` | no | `m` / `female` | `m`/`male`/`nam` or `f`/`female`/`nữ` (case-insensitive). Used for the illustrated placeholder avatar when a person has no image. Unrecognized values fall back to the initials avatar with a warning. |
+
+### Layout settings
+
+The gear button in the toolbar opens layout settings: card style (Classic / Circle / Photo left / Arch),
+what cards show (Full / Name / Avatar), name position, placeholder style (initials or illustrated
+silhouettes), connector shape, and spacing sliders. Choices are saved per family in your browser
+(localStorage) and apply instantly; Reset restores the defaults.
 
 ### Publishing your sheet
 
