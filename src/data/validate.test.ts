@@ -3,7 +3,7 @@ import type { PersonRow } from './types';
 import { validateRows } from './validate';
 
 const row = (o: Partial<PersonRow> = {}): PersonRow =>
-  ({ rowNumber: 2, id: 'r2', fullName: 'Ann Lee', image: '', partnerId: '', parentIds: [], ...o });
+  ({ rowNumber: 2, id: 'r2', fullName: 'Ann Lee', image: '', gender: '', partnerId: '', parentIds: [], ...o });
 
 describe('validateRows', () => {
   it('accepts URLs, data URIs, raw base64, and blank images without warnings', () => {
@@ -30,5 +30,15 @@ describe('validateRows', () => {
     ]);
     expect(warnings).toHaveLength(2);
     expect(warnings[1].message).toContain('Bob Lee');
+  });
+
+  it('warns (not errors) on unrecognized Gender values, with the row number', () => {
+    const warnings = validateRows([row({ gender: 'alien' })]);
+    expect(warnings.some((w) => w.row === 2 && /gender/i.test(w.message))).toBe(true);
+  });
+
+  it('no gender warning for blank or valid values', () => {
+    const warnings = validateRows([row(), row({ id: 'r3', rowNumber: 3, fullName: 'Bob Lee', gender: 'nam' })]);
+    expect(warnings.filter((w) => /gender/i.test(w.message))).toEqual([]);
   });
 });

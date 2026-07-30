@@ -8,26 +8,34 @@ A visually premium, view-only family tree web app. Viewers explore the tree on a
 
 The sheet is a **staircase outline** — exactly how a family tree is written in a Word document, one column per generation:
 
-| Đời 1 | Đời 2 | Đời 3 | Image | PartnerImage |
-|---|---|---|---|---|
-| Võ Như Thôi (1932) + Nguyễn Thị Nga (1936) | | | *photo* | *photo* |
-| | Võ Như Ái + Kiều Thị Nhi | | | |
-| | | Võ Như Trung | | |
-| | | Võ Như Sơn | | |
-| | Võ Thị Ánh – Lê Văn Sinh | | | |
+| Đời 1 | Đời 2 | Đời 3 | Image | PartnerImage | Gender | PartnerGender |
+|---|---|---|---|---|---|---|
+| Võ Như Thôi (1932) + Nguyễn Thị Nga (1936) | | | *photo* | *photo* | m | f |
+| | Võ Như Ái + Kiều Thị Nhi | | | | nam | nữ |
+| | | Võ Như Trung | | | | |
+| | | Võ Như Sơn | | | | |
+| | Võ Thị Ánh – Lê Văn Sinh | | | | | |
 
 Rules:
 
 - **One person (plus partner) per row, in exactly one generation column.** Write the couple in a single cell: `Name + Partner` (a `–` dash also works). Anything else in the cell — birth years like `(1932)`, alternate names — is shown as-is.
 - **Children go directly under their parents, one column to the right.** A row's parent is the nearest row above it in the previous column. After finishing one branch, simply step back out to the shallower column (like Võ Thị Ánh above).
-- **Generations are unlimited** — need a `Đời 9`? Just add a column. Generation column headers can say anything (`Đời 1`, `Gen 1`, …); only `Image` and `PartnerImage` are reserved names.
+- **Generations are unlimited** — need a `Đời 9`? Just add a column. Generation column headers can say anything (`Đời 1`, `Gen 1`, …); only `Image`, `PartnerImage`, `Gender`, and `PartnerGender` are reserved names.
 - **`Image` / `PartnerImage`** hold the photo for the row's person / partner (see [Image rules](#image-rules)). The `Image` column must exist (cells may be empty).
+- **`Gender` / `PartnerGender`** (optional columns) take `m`/`male`/`nam` or `f`/`female`/`nữ`/`nu` (case-insensitive) for the row's person / partner. Used for the illustrated placeholder avatar when a person has no image; unrecognized values fall back to the initials avatar with a warning.
 - **Do not sort the sheet** — row order *is* the family structure.
 - Blank rows are fine as visual spacing.
 
 Mistakes (a row in two columns, a child more than one step deeper than its parent) show a friendly error on the page with the exact row number — fix the sheet and refresh.
 
 **Migrating an older sheet:** sheets using the previous ID-based format (`ID` / `FullName` / `PartnerID` / `ParentIDs` columns) no longer work and must be converted to the staircase layout above. Until converted, the page shows a sheet error (or falls back to the built-in demo data).
+
+### Layout settings
+
+The gear button in the toolbar opens layout settings: card style (Classic / Circle / Photo left / Arch),
+what cards show (Full / Name / Avatar), name position, placeholder style (initials or illustrated
+silhouettes), connector shape, and spacing sliders. Choices are saved per family in your browser
+(localStorage) and apply instantly; Reset restores the defaults.
 
 ### Publishing your sheet
 

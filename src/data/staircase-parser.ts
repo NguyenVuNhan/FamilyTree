@@ -32,12 +32,16 @@ export function parseStaircase(text: string): ParseResult {
   // left-to-right order among generation columns — unbounded by design.
   let imageIdx = -1;
   let partnerImageIdx = -1;
+  let genderIdx = -1;
+  let partnerGenderIdx = -1;
   const genCols: GenColumn[] = [];
   table[0].forEach((raw, index) => {
     const label = (raw ?? '').trim();
     const key = label.toLowerCase();
     if (key === 'image') imageIdx = index;
     else if (key === 'partnerimage') partnerImageIdx = index;
+    else if (key === 'gender') genderIdx = index;
+    else if (key === 'partnergender') partnerGenderIdx = index;
     else if (label !== '') genCols.push({ index, label });
   });
   if (imageIdx === -1 || genCols.length === 0) throw new UnreadableSheetError();
@@ -55,6 +59,10 @@ export function parseStaircase(text: string): ParseResult {
     const at = (index: number) => cells[index] ?? '';
     const image = at(imageIdx);
     const partnerImage = partnerImageIdx === -1 ? '' : at(partnerImageIdx);
+    // Gender cells are soft metadata: stray values on spacing or partner-less
+    // rows are ignored; unrecognized values get a validate-level warning.
+    const gender = genderIdx === -1 ? '' : at(genderIdx);
+    const partnerGender = partnerGenderIdx === -1 ? '' : at(partnerGenderIdx);
 
     const filled = genCols.filter((g) => at(g.index) !== '');
     if (filled.length === 0) {
@@ -101,9 +109,9 @@ export function parseStaircase(text: string): ParseResult {
     const parent = depth === 0 ? undefined : stack[depth - 1];
     const parentIds = parent ? [parent.personId, parent.partnerId].filter(Boolean) : [];
 
-    rows.push({ rowNumber, id: personId, fullName, image, partnerId, parentIds });
+    rows.push({ rowNumber, id: personId, fullName, image, gender, partnerId, parentIds });
     if (partnerId) {
-      rows.push({ rowNumber, id: partnerId, fullName: partnerName, image: partnerImage, partnerId: '', parentIds: [] });
+      rows.push({ rowNumber, id: partnerId, fullName: partnerName, image: partnerImage, gender: partnerGender, partnerId: '', parentIds: [] });
     } else if (partnerImage) {
       warnings.push({ row: rowNumber, message: `Row ${rowNumber} has a partner image but no partner — the image is ignored` });
     }

@@ -4,7 +4,7 @@ import { buildModel } from './build-model';
 
 // buildModel is format-agnostic: build PersonRow[] directly, same as layout-engine.test.ts.
 const P = (rowNumber: number, id: string, o: Partial<PersonRow> = {}): PersonRow => ({
-  rowNumber, id, fullName: id.toUpperCase(), image: '', partnerId: '', parentIds: [], ...o,
+  rowNumber, id, fullName: id.toUpperCase(), image: '', gender: '', partnerId: '', parentIds: [], ...o,
 });
 
 describe('buildModel', () => {
@@ -89,5 +89,18 @@ describe('buildModel', () => {
     ]);
     expect(model.excludedIds).toEqual(['a']);
     expect(model.rootId).toBe('p:z');
+  });
+
+  it('carries parsed gender onto Person; unparseable gender is omitted', () => {
+    // a/b/c linked into one family (partner + child) so all three survive the
+    // largest-connected-component filter; only Gender values differ under test.
+    const model = buildModel([
+      P(2, 'a', { fullName: 'Ann', gender: 'f', partnerId: 'b' }),
+      P(3, 'b', { fullName: 'Bob' }),
+      P(4, 'c', { fullName: 'Cid', gender: 'huh', parentIds: ['a', 'b'] }),
+    ]);
+    expect(model.persons.get('a')!.gender).toBe('female');
+    expect(model.persons.get('b')!.gender).toBeUndefined();
+    expect(model.persons.get('c')!.gender).toBeUndefined();
   });
 });

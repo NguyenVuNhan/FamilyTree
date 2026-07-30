@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { parseStaircase, UnreadableSheetError } from './staircase-parser';
 import { buildModel } from './build-model';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
+import { DEFAULT_METRICS } from '../layout/card-metrics';
 
 describe('parseStaircase — header classification', () => {
   it('parses a single person with a synthesized id and true sheet row number', () => {
     const { rows, errors, warnings } = parseStaircase('Đời 1,Image\nAnn Lee,');
     expect(errors).toEqual([]);
     expect(warnings).toEqual([]);
-    expect(rows).toEqual([{ rowNumber: 2, id: 'r2', fullName: 'Ann Lee', image: '', partnerId: '', parentIds: [] }]);
+    expect(rows).toEqual([{ rowNumber: 2, id: 'r2', fullName: 'Ann Lee', image: '', gender: '', partnerId: '', parentIds: [] }]);
   });
 
   it('matches reserved headers case-insensitively and maps Image cells', () => {
@@ -48,8 +49,8 @@ describe('parseStaircase — couples and separators', () => {
   it('splits "Name + Partner" into two persons wired as a couple', () => {
     const { rows } = parseStaircase('Đời 1,Image\nAnn Lee + Bob Lee,');
     expect(rows).toEqual([
-      { rowNumber: 2, id: 'r2', fullName: 'Ann Lee', image: '', partnerId: 'r2p', parentIds: [] },
-      { rowNumber: 2, id: 'r2p', fullName: 'Bob Lee', image: '', partnerId: '', parentIds: [] },
+      { rowNumber: 2, id: 'r2', fullName: 'Ann Lee', image: '', gender: '', partnerId: 'r2p', parentIds: [] },
+      { rowNumber: 2, id: 'r2p', fullName: 'Bob Lee', image: '', gender: '', partnerId: '', parentIds: [] },
     ]);
   });
 
@@ -82,6 +83,20 @@ describe('parseStaircase — couples and separators', () => {
     const { rows } = parseStaircase('Đời 1,Image,PartnerImage\nAnn Lee + Bob Lee,https://x.test/a.jpg,https://x.test/b.jpg');
     expect(rows[0].image).toBe('https://x.test/a.jpg');
     expect(rows[1].image).toBe('https://x.test/b.jpg');
+  });
+
+  it('Gender and PartnerGender reserved columns land on the person and partner rows', () => {
+    const { rows } = parseStaircase('Đời 1,Image,Gender,PartnerGender\nAnn Lee + Bob Lee,,f,nam');
+    expect(rows[0].gender).toBe('f');
+    expect(rows[1].gender).toBe('nam');
+  });
+
+  it('stray gender cells (spacing row or partner-less row) are ignored silently', () => {
+    const { rows, errors, warnings } = parseStaircase('Đời 1,Image,Gender,PartnerGender\nAnn Lee,,f,m\n,,f,');
+    expect(errors).toEqual([]);
+    expect(warnings).toEqual([]); // PartnerGender without partner and gender-only spacing row: soft metadata, no noise
+    expect(rows).toHaveLength(1);
+    expect(rows[0].gender).toBe('f');
   });
 
   it('handles quoted cells containing commas (data URIs)', () => {
@@ -178,7 +193,7 @@ describe('parseStaircase — unbounded generation depth', () => {
     expect(rows[N - 1].parentIds).toEqual([`r${N}`]); // sheet row 26's parent is row 25's person
 
     const model = buildModel(rows);
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual([]);
     expect(layout.cards).toHaveLength(N);
   });

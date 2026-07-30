@@ -51,10 +51,12 @@ test('E2E-04: fit-to-view recovers after panning away (UC-3)', async ({ page }) 
   expect(back.y).toBeCloseTo(home.y, 0);
 });
 
-test('E2E-05: Photo|Name toggle switches collapsed cards (UC-5)', async ({ page }) => {
-  // default photo mode: avatar visible, name text hidden
+test('E2E-05: Show mode switches collapsed cards (UC-5)', async ({ page }) => {
+  // default avatar mode: avatar visible, name text hidden
   await expect(card(page, 'r2p').getByText('Robert Ellis')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Name' }).click();
+  await page.getByRole('button', { name: 'Layout settings' }).click();
+  await page.getByTestId('settings-panel').getByRole('button', { name: 'Name', exact: true }).click();
+  await page.keyboard.press('Escape'); // close the panel so it doesn't cover cards
   await expect(card(page, 'r2p').getByText('Robert Ellis')).toBeVisible();
   await expect(card(page, 'r2p').getByRole('img')).toHaveCount(0);
 });
@@ -74,10 +76,17 @@ test('E2E-06: expand/collapse via every path; never two expanded (UC-6)', async 
 });
 
 test('E2E-07: expanded card keeps both across mode toggle (UC-7, UC-8)', async ({ page }) => {
-  await page.getByRole('button', { name: 'Name' }).click();
+  // Close the panel via the gear toggle (not Escape) so the expanded card isn't collapsed.
+  const gear = page.getByRole('button', { name: 'Layout settings' });
+  const panel = page.getByTestId('settings-panel');
+  await gear.click();
+  await panel.getByRole('button', { name: 'Name', exact: true }).click();
+  await gear.click();
   await card(page, 'r2p').click();
   await expect(card(page, 'r2p').getByRole('img')).toBeVisible();
-  await page.getByRole('button', { name: 'Photo' }).click();
+  await gear.click();
+  await panel.getByRole('button', { name: 'Avatar', exact: true }).click();
+  await gear.click();
   await expect(card(page, 'r2p')).toHaveAttribute('data-expanded', 'true');
   await expect(card(page, 'r2p').getByText('Robert Ellis')).toBeVisible();
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 
@@ -7,7 +7,7 @@ const DEMO_CSV = 'Đời 1,Đời 2,Image\nMa Ellis + Pa Ellis,,\n,Kid Ellis,';
 
 const okFetch = () => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => DEMO_CSV }) as Response));
 const setUrl = (search: string) => window.history.replaceState({}, '', `/${search}`);
-afterEach(() => { vi.unstubAllGlobals(); setUrl(''); });
+afterEach(() => { vi.unstubAllGlobals(); setUrl(''); localStorage.clear(); });
 
 // With no FAMILY_TREE_* env in tests, the registry contains only demo.
 describe('App', () => {
@@ -64,5 +64,32 @@ describe('App', () => {
     setUrl('?family=demo');
     render(<App />);
     expect(await screen.findByTestId('error-panel')).toHaveTextContent(/must start in/);
+  });
+
+  it('gear opens the settings panel; changing card style re-renders and persists', async () => {
+    okFetch();
+    render(<App />);
+    await waitFor(() => screen.getAllByRole('button', { name: /Ellis/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Layout settings' }));
+    await userEvent.click(within(screen.getByTestId('settings-panel')).getByRole('button', { name: 'Circle' }));
+    expect(document.querySelector('.person-card.style-circle')).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem('ft:layout:demo')!)).toMatchObject({ cardStyle: 'circle' });
+  });
+
+  it('Escape closes the settings panel', async () => {
+    okFetch();
+    render(<App />);
+    await waitFor(() => screen.getAllByRole('button', { name: /Ellis/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Layout settings' }));
+    expect(screen.getByTestId('settings-panel')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
+  });
+
+  it('saved settings are loaded on mount', async () => {
+    localStorage.setItem('ft:layout:demo', JSON.stringify({ contentMode: 'name' }));
+    okFetch();
+    render(<App />);
+    await waitFor(() => screen.getByText('Ma Ellis')); // name mode renders names
   });
 });

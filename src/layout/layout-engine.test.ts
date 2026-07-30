@@ -2,15 +2,24 @@ import { describe, expect, it } from 'vitest';
 import type { PersonRow } from '../data/types';
 import { buildModel } from '../data/build-model';
 import { layoutTree, unplacedIds } from './layout-engine';
-import { CARD_H, CARD_W, COUPLE_GAP, GEN_GAP, MARGIN, SIBLING_GAP } from './constants';
+import { DEFAULT_METRICS } from './card-metrics';
+
+const {
+  cardW: CARD_W,
+  cardH: CARD_H,
+  coupleGap: COUPLE_GAP,
+  siblingGap: SIBLING_GAP,
+  genGap: GEN_GAP,
+  margin: MARGIN,
+} = DEFAULT_METRICS;
 
 // Layout is format-agnostic: build PersonRow[] directly. (Some shapes below —
 // multi-root in-laws, cousins marrying — are deliberately inexpressible in the
 // staircase sheet format but must keep working at the model/layout level.)
 const P = (rowNumber: number, id: string, o: Partial<PersonRow> = {}): PersonRow => ({
-  rowNumber, id, fullName: id.toUpperCase(), image: '', partnerId: '', parentIds: [], ...o,
+  rowNumber, id, fullName: id.toUpperCase(), image: '', gender: '', partnerId: '', parentIds: [], ...o,
 });
-const lay = (rows: PersonRow[]) => layoutTree(buildModel(rows));
+const lay = (rows: PersonRow[]) => layoutTree(buildModel(rows), DEFAULT_METRICS);
 const card = (r: ReturnType<typeof lay>, id: string) => r.cards.find((c) => c.personId === id)!;
 
 describe('layoutTree', () => {
@@ -95,7 +104,7 @@ describe('multi-root sheets (a rendered child\'s spouse\'s parents are also pres
 
   it('the orphaned in-laws never get a card', () => {
     const model = buildModel(ROWS);
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     const ids = layout.cards.map((c) => c.personId);
     expect(ids).not.toContain('fa');
     expect(ids).not.toContain('mo');
@@ -103,13 +112,13 @@ describe('multi-root sheets (a rendered child\'s spouse\'s parents are also pres
 
   it('unplacedIds reports exactly the orphaned in-laws', () => {
     const model = buildModel(ROWS);
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual(['fa', 'mo']);
   });
 
   it('unplacedIds is empty for an ordinary well-formed tree', () => {
     const model = buildModel([P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'), P(4, 'k1', { parentIds: ['ma', 'pa'] })]);
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual([]);
   });
 });
@@ -126,7 +135,7 @@ describe('two rendered children marrying each other (dedupes the shared union)',
 
   it('every person appears exactly once in layout.cards (no duplicate keys)', () => {
     const model = buildModel(ROWS);
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     const ids = layout.cards.map((c) => c.personId);
     const counts = new Map<string, number>();
     for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
@@ -136,7 +145,32 @@ describe('two rendered children marrying each other (dedupes the shared union)',
 
   it('nothing is left unplaced — the shared union is rendered once, not dropped', () => {
     const model = buildModel(ROWS);
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual([]);
+  });
+});
+
+describe('metrics parameterization', () => {
+  it('a larger generation gap moves children further down', () => {
+    const rows = () => [P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'), P(4, 'k1', { parentIds: ['ma', 'pa'] })];
+    const wide = layoutTree(buildModel(rows()), { ...DEFAULT_METRICS, genGap: 200 });
+    const base = layoutTree(buildModel(rows()), DEFAULT_METRICS);
+    const kY = (r: typeof base) => r.cards.find((c) => c.personId === 'k1')!.y;
+    expect(kY(wide) - kY(base)).toBe(200 - DEFAULT_METRICS.genGap);
+  });
+
+  it('a larger sibling gap widens the canvas', () => {
+    const rows = () => [
+      P(2, 'ma', { partnerId: 'pa' }), P(3, 'pa'),
+      P(4, 'k1', { parentIds: ['ma', 'pa'] }), P(5, 'k2', { parentIds: ['ma', 'pa'] }), P(6, 'k3', { parentIds: ['ma', 'pa'] }),
+    ];
+    const wide = layoutTree(buildModel(rows()), { ...DEFAULT_METRICS, siblingGap: 100 });
+    const base = layoutTree(buildModel(rows()), DEFAULT_METRICS);
+    expect(wide.width).toBe(base.width + 2 * (100 - DEFAULT_METRICS.siblingGap));
+  });
+
+  it('connector style flows through to path generation', () => {
+    const straight = layoutTree(buildModel([P(2, 'ma'), P(3, 'k1', { parentIds: ['ma'] })]), { ...DEFAULT_METRICS, connectorStyle: 'straight' });
+    for (const d of straight.connectors) expect(d).not.toContain('Q'); // no elbow arcs
   });
 });
