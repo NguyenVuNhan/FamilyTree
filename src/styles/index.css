@@ -1,5 +1,7 @@
 @import '@fontsource/inter/400.css';
 @import '@fontsource/inter/600.css';
+@import '@fontsource/be-vietnam-pro/400.css';
+@import '@fontsource/be-vietnam-pro/600.css';
 @import 'tailwindcss';
 
 :root { font-family: Inter, system-ui, sans-serif; }
@@ -37,7 +39,11 @@ body { background: #f6f7f9; color: #1a202c; }
   transform: scale(1.08); z-index: 10;
   box-shadow: 0 8px 16px rgb(16 24 40 / 0.12), 0 20px 44px rgb(16 24 40 / 0.18);
 }
-.person-name { font-size: 13.5px; font-weight: 600; text-align: center; }
+.person-name {
+  font-family: 'Be Vietnam Pro', Inter, system-ui, sans-serif;
+  font-size: 13.5px; font-weight: 600; text-align: center; color: #1a202c;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 .toolbar {
   display: flex; align-items: center; gap: 20px; padding: 10px 20px;
@@ -63,9 +69,64 @@ body { background: #f6f7f9; color: #1a202c; }
 .spinner { width: 36px; height: 36px; border: 3px solid #e9ecf1; border-top-color: #6366f1; border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---- card style variants (issue #4) ---- */
+
+/* circle: bare avatar, no card chrome; label floats on the canvas with a white halo for contrast */
+.person-card.style-circle { background: none; border: none; box-shadow: none; gap: 0; justify-content: flex-start; }
+.person-card.style-circle :is(img, [role='img']) { box-shadow: 0 0 0 3px var(--ring-color, #d4c4a8), 0 1px 4px rgb(16 24 40 / 0.15); }
+.person-card.style-circle .person-name {
+  margin-top: var(--pad, 14px);
+  text-shadow: 0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff, 0 0 6px #fff;
+}
+.person-card.style-circle:hover { box-shadow: none; }
+.person-card.style-circle.expanded {
+  background: #fff; border: 1px solid #e9ecf1; border-radius: 16px; padding: 10px;
+  box-shadow: 0 8px 16px rgb(16 24 40 / 0.12), 0 20px 44px rgb(16 24 40 / 0.18);
+}
+.person-card.style-circle.expanded .person-name { text-shadow: none; margin-top: 6px; }
+
+/* photoLeft: compact horizontal card (Elvis-tree style) */
+.person-card.style-photoLeft { flex-direction: row; justify-content: flex-start; gap: 10px; border-radius: 12px; }
+.person-card.style-photoLeft :is(img, [role='img']) { border-radius: 8px; }
+.person-card.style-photoLeft .person-name { text-align: left; }
+.person-card.style-photoLeft.expanded { flex-direction: column; }
+
+/* archCard: warm heritage card, full-width image with arched top (MUI-media style) */
+.person-card.style-archCard {
+  justify-content: flex-start; gap: 0; overflow: hidden;
+  border-radius: 60px 60px 16px 16px;
+  background: #f5f0e1; border-color: #d4c4a8;
+}
+.person-card.style-archCard .person-name { padding: var(--pad, 14px) 10px; }
+.person-card.style-archCard.expanded { border-radius: 16px; padding: 10px; background: #fff; }
+
+/* ---- settings panel ---- */
+.settings-panel {
+  position: absolute; top: 56px; right: 12px; z-index: 30; width: 264px;
+  display: flex; flex-direction: column; gap: 12px; padding: 14px;
+  background: rgb(255 255 255 / 0.95); backdrop-filter: blur(10px);
+  border: 1px solid #e9ecf1; border-radius: 14px;
+  box-shadow: 0 8px 16px rgb(16 24 40 / 0.08), 0 20px 44px rgb(16 24 40 / 0.14);
+  max-height: calc(100vh - 72px); overflow-y: auto;
+}
+.settings-row { display: flex; flex-direction: column; gap: 4px; }
+.settings-label { font-size: 12.5px; font-weight: 600; color: #4a5568; display: flex; justify-content: space-between; }
+.settings-label output { font-weight: 400; color: #718096; }
+.settings-row .segmented button { flex: 1; }
+.settings-row .segmented button:disabled { opacity: 0.45; cursor: not-allowed; }
+.settings-reset {
+  padding: 7px 12px; font-size: 13px; border: 1px solid #e9ecf1; border-radius: 10px; background: #fff;
+}
+.settings-reset:hover { background: #f6f7f9; }
+
+/* ---- motion & print ---- */
+@media (prefers-reduced-motion: reduce) {
+  .person-card, .person-card:hover, .person-card.expanded { transition: none; transform: none; }
+}
+
 @page { size: landscape; }
 @media print {
-  .toolbar, .sample-banner, .warnings { display: none !important; }
+  .toolbar, .sample-banner, .warnings, .settings-panel { display: none !important; }
   .viewport { overflow: visible; background-image: none; }
   .viewport-transform { transform: scale(var(--print-scale, 1)) !important; }
   .connector { stroke: #6b7280; }
