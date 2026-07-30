@@ -18,6 +18,12 @@ export function PersonCard({ person, settings, expanded, x, y, onToggle }: {
   const bleeds = style === 'circle' || style === 'archCard'; // image/circle reaches the card edge
 
   const name = <span className="person-name" title={person.fullName}>{person.fullName}</span>;
+  // Expanded: absolute-positioned overlay may grow past its slot (minHeight, no inline padding —
+  // CSS governs it, see .person-card.expanded / .style-circle.expanded / .style-archCard.expanded).
+  // Collapsed: fixed height, inline padding as before.
+  const sizeStyle: CSSProperties = expanded
+    ? { minHeight: cardH }
+    : { height: cardH, padding: bleeds ? 0 : settings.cardPadding };
   return (
     <button
       type="button"
@@ -27,7 +33,7 @@ export function PersonCard({ person, settings, expanded, x, y, onToggle }: {
       className={`person-card style-${style}${expanded ? ' expanded' : ''}`}
       style={{
         left: x, top: y, width: cardW,
-        ...(expanded ? { minHeight: cardH } : { height: cardH, padding: bleeds ? 0 : settings.cardPadding }),
+        ...sizeStyle,
         '--pad': `${settings.cardPadding}px`,
         '--ring-color': `hsl(${avatarHue(person.id)} 45% 62%)`,
       } as CSSProperties}
