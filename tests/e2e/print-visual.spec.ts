@@ -12,6 +12,10 @@ test('E2E-28: print media hides chrome, resets transform (UC-4)', async ({ page 
   expect(connectorStroke).toBe('rgb(107, 114, 128)'); // #6b7280 ink-contrast
   const cardBorder = await page.locator('.person-card').first().evaluate((el) => getComputedStyle(el).borderTopColor);
   expect(cardBorder).toBe('rgb(107, 114, 128)'); // #6b7280 — cards must not blend into white paper (issue #3)
+  const colorAdjust = await page.locator('.avatar-fallback').first().evaluate(
+    (el) => getComputedStyle(el).getPropertyValue('-webkit-print-color-adjust'),
+  );
+  expect(colorAdjust).toBe('exact'); // gradient avatars must not print as black discs (issue #3)
 });
 
 test('E2E-29: visual regression at fit-to-view (UC-1) — local guard, CI ignores snapshots', async ({ page }) => {

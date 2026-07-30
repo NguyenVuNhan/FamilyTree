@@ -25,7 +25,7 @@ export function Avatar({ person, size }: { person: Person; size: number }) {
     <div
       role="img"
       aria-label={person.fullName}
-      className="flex items-center justify-center rounded-full font-semibold text-white select-none"
+      className="avatar-fallback flex items-center justify-center rounded-full font-semibold text-white select-none"
       style={{
         width: size,
         height: size,
