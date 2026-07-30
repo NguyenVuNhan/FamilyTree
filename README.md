@@ -4,17 +4,28 @@ A visually premium, view-only family tree web app. Viewers explore the tree on a
 
 ## Admin guide
 
-### Sheet columns
+### Sheet format
 
-One row per person; row order is irrelevant.
+The sheet is a **staircase outline** — exactly how a family tree is written in a Word document, one column per generation:
 
-| Column | Required | Example | Meaning |
-|---|---|---|---|
-| `ID` | yes | `margaret` | Unique key, any text (surrounding whitespace trimmed) |
-| `FullName` | yes | `Margaret Ellis` | Displayed name |
-| `Image` | no | URL / base64 | Blank → initials avatar |
-| `PartnerID` | no | `robert` | Links spouses; filling it on one of the two rows suffices |
-| `ParentIDs` | no | `margaret;robert` | 1–2 ids separated by `;` — attaches this person as a child of that couple/parent |
+| Đời 1 | Đời 2 | Đời 3 | Image | PartnerImage |
+|---|---|---|---|---|
+| Võ Như Thôi (1932) + Nguyễn Thị Nga (1936) | | | *photo* | *photo* |
+| | Võ Như Ái + Kiều Thị Nhi | | | |
+| | | Võ Như Trung | | |
+| | | Võ Như Sơn | | |
+| | Võ Thị Ánh – Lê Văn Sinh | | | |
+
+Rules:
+
+- **One person (plus partner) per row, in exactly one generation column.** Write the couple in a single cell: `Name + Partner` (a `–` dash also works). Anything else in the cell — birth years like `(1932)`, alternate names — is shown as-is.
+- **Children go directly under their parents, one column to the right.** A row's parent is the nearest row above it in the previous column. After finishing one branch, simply step back out to the shallower column (like Võ Thị Ánh above).
+- **Generations are unlimited** — need a `Đời 9`? Just add a column. Generation column headers can say anything (`Đời 1`, `Gen 1`, …); only `Image` and `PartnerImage` are reserved names.
+- **`Image` / `PartnerImage`** hold the photo for the row's person / partner (see [Image rules](#image-rules)). The `Image` column must exist (cells may be empty).
+- **Do not sort the sheet** — row order *is* the family structure.
+- Blank rows are fine as visual spacing.
+
+Mistakes (a row in two columns, a child more than one step deeper than its parent) show a friendly error on the page with the exact row number — fix the sheet and refresh.
 
 ### Publishing your sheet
 
@@ -73,4 +84,5 @@ Run these by hand before/after a release — they aren't automatable in CI:
 - [ ] Real pinch-zoom on a physical touch device (two-pointer pinch is implemented and unit-tested; still worth confirming it feels right on real hardware)
 - [ ] Real print dialog output on A4 and Letter paper, landscape orientation
 - [ ] Google Sheets publish-to-web round-trip with a live sheet (edit a cell, confirm it appears on refresh with no redeploy)
+- [ ] Staircase round-trip with a live sheet: add a person under a parent, refresh, confirm placement; make a deliberate depth-jump mistake, confirm the row-numbered error
 - [ ] Adding a family via repo Variables end-to-end (create the two variables, re-run the workflow, open the shared URL)
