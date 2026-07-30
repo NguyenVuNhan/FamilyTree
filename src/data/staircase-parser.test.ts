@@ -87,3 +87,78 @@ describe('parseStaircase — couples and separators', () => {
     expect(rows[0].image).toBe('data:image/png;base64,iVBORw0KGgo=');
   });
 });
+
+describe('parseStaircase — positional parent resolution', () => {
+  const SHEET = [
+    'Đời 1,Đời 2,Đời 3,Image',
+    'Võ Như Thôi (1932) + Nguyễn Thị Nga (1936),,,', // row 2
+    ',Võ Như Ái + Kiều Thị Nhi,,',                    // row 3
+    ',,Võ Như Trung,',                                // row 4
+    ',,Võ Như Sơn,',                                  // row 5
+    ',Võ Thị Ánh,,',                                  // row 6 — steps back out
+  ].join('\n');
+
+  it('children attach to the nearest shallower row above (the Word-outline rule)', () => {
+    const { rows, errors } = parseStaircase(SHEET);
+    expect(errors).toEqual([]);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get('r3')!.parentIds).toEqual(['r2', 'r2p']); // Ái child of Thôi+Nga
+    expect(byId.get('r4')!.parentIds).toEqual(['r3', 'r3p']); // Trung child of Ái+Nhi
+    expect(byId.get('r5')!.parentIds).toEqual(['r3', 'r3p']); // Sơn = Trung's sibling
+    expect(byId.get('r6')!.parentIds).toEqual(['r2', 'r2p']); // Ánh back out to Đời 2
+  });
+
+  it('a partner-less parent yields a single parent id', () => {
+    const { rows } = parseStaircase('Đời 1,Đời 2,Image\nMona Lee,,\n,Kid One,');
+    expect(rows[1].parentIds).toEqual(['r2']);
+  });
+
+  it('fully empty rows are spacing — skipped, row numbers preserved', () => {
+    const { rows } = parseStaircase('Đời 1,Đời 2,Image\nAnn Lee,,\n,,\n,Kid One,');
+    expect(rows.map((r) => [r.id, r.rowNumber])).toEqual([['r2', 2], ['r4', 4]]);
+    expect(rows[1].parentIds).toEqual(['r2']);
+  });
+
+  it('two generation cells in one row → error naming both columns', () => {
+    const { errors } = parseStaircase('Đời 1,Đời 2,Image\nAnn Lee,Bob Lee,');
+    expect(errors).toEqual([
+      { row: 2, message: 'Row 2 has people in both "Đời 1" and "Đời 2" — each row should use exactly one generation column' },
+    ]);
+  });
+
+  it('first person row deeper than the first generation → must-start error', () => {
+    const { errors } = parseStaircase('Đời 1,Đời 2,Image\n,Orphan Kid,');
+    expect(errors).toEqual([{ row: 2, message: 'Row 2 is in "Đời 2" but the tree must start in "Đời 1"' }]);
+  });
+
+  it('depth jump deeper than parent+1 → did-you-mean error', () => {
+    const { errors } = parseStaircase('Đời 1,Đời 2,Đời 3,Image\nAnn Lee,,,\n,,Deep Kid,');
+    expect(errors).toEqual([
+      { row: 3, message: 'Row 3 is in "Đời 3" but the row above it is in "Đời 1" — did you mean "Đời 2"?' },
+    ]);
+  });
+
+  it('separator with no name before it → missing-name error', () => {
+    const { errors } = parseStaircase('Đời 1,Image\n+ Ghost Partner,');
+    expect(errors).toEqual([{ row: 2, message: 'Row 2 is missing the person\'s name before the "+"' }]);
+  });
+
+  it('collects every error in one pass; error rows never become parents', () => {
+    const text = ['Đời 1,Đời 2,Image', 'Ann Lee,Bob Lee,', ',Kid One,', '+ Ghost,'].join('\n');
+    const { rows, errors } = parseStaircase(text);
+    expect(errors).toHaveLength(3); // two-cells, must-start (row 2 didn't enter the stack), missing-name
+    expect(rows).toEqual([]);
+  });
+
+  it('image on a spacing row → warning, image ignored', () => {
+    const { warnings, rows } = parseStaircase('Đời 1,Image\nAnn Lee,\n,https://x.test/lost.jpg');
+    expect(rows).toHaveLength(1);
+    expect(warnings).toEqual([{ row: 3, message: 'Row 3 has an image but no person — the image is ignored' }]);
+  });
+
+  it('partner image without a partner → warning, image ignored', () => {
+    const { warnings, rows } = parseStaircase('Đời 1,Image,PartnerImage\nAnn Lee,,https://x.test/b.jpg');
+    expect(rows).toHaveLength(1);
+    expect(warnings).toEqual([{ row: 2, message: 'Row 2 has a partner image but no partner — the image is ignored' }]);
+  });
+});
