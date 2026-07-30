@@ -1,4 +1,4 @@
-ID,FullName,Image,PartnerID,ParentIDs
-ma,Mona Lee,,,
-k1,Kid One,,,ma
-k2,Kid Two,,,ma
+Đời 1,Đời 2,Image
+Mona Lee,,
+,Kid One,
+,Kid Two,

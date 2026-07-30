@@ -1,6 +1,5 @@
-ID,FullName,Image,PartnerID,ParentIDs
-url,Url Person,https://img.example/p.jpg,datauri,
-datauri,Data Uri,"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",,
-raw,Raw B64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==,,url;datauri
-blank,Blank One,,,url;datauri
-blank2,Blank Two,,,url;datauri
+Đời 1,Đời 2,Image,PartnerImage
+Url Person + Data Uri,,https://img.example/p.jpg,"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+,Raw B64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==,
+,Blank One,,
+,Blank Two,,

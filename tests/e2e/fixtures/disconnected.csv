@@ -1,8 +1,5 @@
-ID,FullName,Image,PartnerID,ParentIDs
-margaret,Margaret Ellis,https://img.example/margaret.jpg,robert,
-robert,Robert Ellis,,,
-david,David Ellis,,sarah,margaret;robert
-sarah,Sarah Park,,,
-linda,Linda Ellis,,,margaret;robert
-x1,Lost One,,x2,
-x2,Lost Two,,,
+Đời 1,Đời 2,Image
+Margaret Ellis + Robert Ellis,,https://img.example/margaret.jpg
+,David Ellis + Sarah Park,
+,Linda Ellis,
+Lost One + Lost Two,

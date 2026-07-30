@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('https://img.example/**', (r) => r.abort()); // avatar fallback path is fine
   await serveCsv(page, { fixtureName: 'standard.csv' });
   await page.goto('/?family=alpha');
-  await expect(card(page, 'margaret')).toBeVisible();
+  await expect(card(page, 'r2')).toBeVisible();
 });
 
 test('E2E-02: drag pans, wheel zooms toward cursor, % updates (UC-2)', async ({ page }) => {
@@ -53,37 +53,37 @@ test('E2E-04: fit-to-view recovers after panning away (UC-3)', async ({ page }) 
 
 test('E2E-05: Photo|Name toggle switches collapsed cards (UC-5)', async ({ page }) => {
   // default photo mode: avatar visible, name text hidden
-  await expect(card(page, 'robert').getByText('Robert Ellis')).toHaveCount(0);
+  await expect(card(page, 'r2p').getByText('Robert Ellis')).toHaveCount(0);
   await page.getByRole('button', { name: 'Name' }).click();
-  await expect(card(page, 'robert').getByText('Robert Ellis')).toBeVisible();
-  await expect(card(page, 'robert').getByRole('img')).toHaveCount(0);
+  await expect(card(page, 'r2p').getByText('Robert Ellis')).toBeVisible();
+  await expect(card(page, 'r2p').getByRole('img')).toHaveCount(0);
 });
 
 test('E2E-06: expand/collapse via every path; never two expanded (UC-6)', async ({ page }) => {
-  await card(page, 'robert').click();
-  await expect(card(page, 'robert')).toHaveAttribute('data-expanded', 'true');
-  await expect(card(page, 'robert').getByText('Robert Ellis')).toBeVisible(); // photo mode + expanded → both
-  await card(page, 'robert').click();
-  await expect(card(page, 'robert')).toHaveAttribute('data-expanded', 'false');
-  await card(page, 'robert').click();
-  await card(page, 'linda').click();
+  await card(page, 'r2p').click();
+  await expect(card(page, 'r2p')).toHaveAttribute('data-expanded', 'true');
+  await expect(card(page, 'r2p').getByText('Robert Ellis')).toBeVisible(); // photo mode + expanded → both
+  await card(page, 'r2p').click();
+  await expect(card(page, 'r2p')).toHaveAttribute('data-expanded', 'false');
+  await card(page, 'r2p').click();
+  await card(page, 'r6').click();
   await expect(page.locator('[data-expanded="true"]')).toHaveCount(1);
-  await expect(card(page, 'linda')).toHaveAttribute('data-expanded', 'true');
+  await expect(card(page, 'r6')).toHaveAttribute('data-expanded', 'true');
   await page.getByTestId('viewport').click({ position: { x: 10, y: 10 } });
   await expect(page.locator('[data-expanded="true"]')).toHaveCount(0);
 });
 
 test('E2E-07: expanded card keeps both across mode toggle (UC-7, UC-8)', async ({ page }) => {
   await page.getByRole('button', { name: 'Name' }).click();
-  await card(page, 'robert').click();
-  await expect(card(page, 'robert').getByRole('img')).toBeVisible();
+  await card(page, 'r2p').click();
+  await expect(card(page, 'r2p').getByRole('img')).toBeVisible();
   await page.getByRole('button', { name: 'Photo' }).click();
-  await expect(card(page, 'robert')).toHaveAttribute('data-expanded', 'true');
-  await expect(card(page, 'robert').getByText('Robert Ellis')).toBeVisible();
+  await expect(card(page, 'r2p')).toHaveAttribute('data-expanded', 'true');
+  await expect(card(page, 'r2p').getByText('Robert Ellis')).toBeVisible();
 });
 
 test('E2E-08: expansion survives pan and zoom (UC-9)', async ({ page }) => {
-  await card(page, 'robert').click();
+  await card(page, 'r2p').click();
   const vp = page.getByTestId('viewport');
   const box = (await vp.boundingBox())!;
   await page.mouse.move(box.x + 100, box.y + 400);
@@ -91,11 +91,11 @@ test('E2E-08: expansion survives pan and zoom (UC-9)', async ({ page }) => {
   await page.mouse.move(box.x + 300, box.y + 400);
   await page.mouse.up();
   await page.mouse.wheel(0, -120);
-  await expect(card(page, 'robert')).toHaveAttribute('data-expanded', 'true');
+  await expect(card(page, 'r2p')).toHaveAttribute('data-expanded', 'true');
 });
 
 test('E2E-09: a drag ending on a card does NOT expand it (UC-10)', async ({ page }) => {
-  const target = (await card(page, 'david').boundingBox())!;
+  const target = (await card(page, 'r3').boundingBox())!;
   await page.mouse.move(target.x - 60, target.y + 10);
   await page.mouse.down();
   await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 5 });
