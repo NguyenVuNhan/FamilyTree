@@ -27,7 +27,7 @@ export const SPACING_BOUNDS = {
 
 export const DEFAULT_SETTINGS: LayoutSettings = {
   cardStyle: 'classic',
-  contentMode: 'avatar', // today's default view (was DisplayMode 'photo')
+  contentMode: 'avatar', // today's default view (avatar-only, photo-style)
   namePosition: 'bottom',
   cardPadding: 14,
   coupleGap: COUPLE_GAP,

@@ -4,10 +4,11 @@ import { resolveFamily } from '../config/families';
 import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
-import { loadSettings } from '../settings/settings';
+import { loadSettings, saveSettings, type LayoutSettings } from '../settings/settings';
 import { ErrorPanel } from './ErrorPanel';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
 import { SampleDataBanner } from './SampleDataBanner';
+import { SettingsPanel } from './SettingsPanel';
 import { Toolbar } from './Toolbar';
 import { TreeCanvas } from './TreeCanvas';
 import { useFamilyData } from './use-family-data';
@@ -30,16 +31,26 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
   const family = families.find((f) => f.key === familyKey)!;
   const isOnlyDemo = families.length === 1;
   const data = useFamilyData(family, isOnlyDemo);
-  const [settings] = useState(() => loadSettings(family.key));
+  const [settings, setSettings] = useState(() => loadSettings(family.key));
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [scalePct, setScalePct] = useState(100);
   const [panelOpen, setPanelOpen] = useState(false);
   const viewport = useRef<ViewportApi | null>(null);
 
+  const changeSettings = (s: LayoutSettings) => {
+    setSettings(s);
+    saveSettings(family.key, s);
+  };
+
   useEffect(() => { document.title = `${family.displayName} — Family Tree`; }, [family.displayName]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandedId(null); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPanelOpen(false);
+        setExpandedId(null);
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
@@ -87,6 +98,7 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
         settingsOpen={panelOpen}
         onToggleSettings={() => setPanelOpen((o) => !o)}
       />
+      {panelOpen && <SettingsPanel settings={settings} onChange={changeSettings} />}
       {data.source === 'fallback' && !bannerDismissed && data.fallbackReason && (
         <SampleDataBanner reason={data.fallbackReason} onDismiss={() => setBannerDismissed(true)} />
       )}
@@ -97,7 +109,7 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
       )}
       <PanZoomViewport
         contentSize={{ width: layout!.width, height: layout!.height }}
-        onBackgroundClick={() => setExpandedId(null)}
+        onBackgroundClick={() => { setExpandedId(null); setPanelOpen(false); }}
         viewportRef={viewport}
         onScaleChange={setScalePct}
       >

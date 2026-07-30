@@ -1,5 +1,3 @@
-export type DisplayMode = 'photo' | 'name';
-
 export interface PersonRow {
   rowNumber: number;        // sheet row: header is 1, first person is 2
   id: string;               // trimmed
