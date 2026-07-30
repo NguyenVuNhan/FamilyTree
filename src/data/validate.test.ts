@@ -113,4 +113,15 @@ describe('validateRows warnings', () => {
     const r = v(`${H}\nrobert,Rob,,,\nROBERT2,Rob2,,,\nRobert,Other Rob,,,`);
     expect(r.warnings.some((w) => w.message.includes('only by letter case'))).toBe(true);
   });
+
+  it('warns (not errors) on unrecognized Gender values, with the row number', () => {
+    const { errors, warnings } = validateRows(parseCsv('ID,FullName,Gender\na,Ann,alien'));
+    expect(errors).toEqual([]);
+    expect(warnings.some((w) => w.row === 2 && /gender/i.test(w.message))).toBe(true);
+  });
+
+  it('no gender warning for blank or valid values', () => {
+    const { warnings } = validateRows(parseCsv('ID,FullName,Gender\na,Ann,\nb,Bob,nam'));
+    expect(warnings.filter((w) => /gender/i.test(w.message))).toEqual([]);
+  });
 });

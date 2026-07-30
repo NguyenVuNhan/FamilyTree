@@ -8,7 +8,9 @@ test('SMK-01: demo tree renders live; toggle and expand work (UC-38, UC-1, UC-5,
   await expect(page.getByRole('heading', { name: 'Demo Family' })).toBeVisible();
   await expect(page.locator('.person-card')).toHaveCount(10);
   expect(await page.getByTestId('connector-layer').locator('path').count()).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'Name' }).click();
+  await page.getByRole('button', { name: 'Layout settings' }).click();
+  await page.getByTestId('settings-panel').getByRole('button', { name: 'Name', exact: true }).click();
+  await page.keyboard.press('Escape'); // close the panel so it doesn't cover cards
   await expect(page.getByText('Margaret Ellis')).toBeVisible();
   await page.locator('[data-person-id="margaret"]').click();
   await expect(page.locator('[data-expanded="true"]')).toHaveCount(1);

@@ -2,10 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { parseCsv } from '../data/csv-parser';
 import { buildModel } from '../data/build-model';
 import { layoutTree, unplacedIds } from './layout-engine';
-import { CARD_H, CARD_W, COUPLE_GAP, GEN_GAP, MARGIN, SIBLING_GAP } from './constants';
+import { DEFAULT_METRICS } from './card-metrics';
+
+const {
+  cardW: CARD_W,
+  cardH: CARD_H,
+  coupleGap: COUPLE_GAP,
+  siblingGap: SIBLING_GAP,
+  genGap: GEN_GAP,
+  margin: MARGIN,
+} = DEFAULT_METRICS;
 
 const H = 'ID,FullName,Image,PartnerID,ParentIDs';
-const lay = (csv: string) => layoutTree(buildModel(parseCsv(csv)));
+const lay = (csv: string) => layoutTree(buildModel(parseCsv(csv)), DEFAULT_METRICS);
 const card = (r: ReturnType<typeof lay>, id: string) => r.cards.find((c) => c.personId === id)!;
 
 describe('layoutTree', () => {
@@ -79,7 +88,7 @@ wife,Wife,,,fa;mo`;
 
   it('the orphaned in-laws never get a card', () => {
     const model = buildModel(parseCsv(CSV));
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     const ids = layout.cards.map((c) => c.personId);
     expect(ids).not.toContain('fa');
     expect(ids).not.toContain('mo');
@@ -87,13 +96,13 @@ wife,Wife,,,fa;mo`;
 
   it('unplacedIds reports exactly the orphaned in-laws', () => {
     const model = buildModel(parseCsv(CSV));
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual(['fa', 'mo']);
   });
 
   it('unplacedIds is empty for an ordinary well-formed tree', () => {
     const model = buildModel(parseCsv(`${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa`));
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual([]);
   });
 });
@@ -113,7 +122,7 @@ b,B,,,f;y`;
 
   it('every person appears exactly once in layout.cards (no duplicate keys)', () => {
     const model = buildModel(parseCsv(CSV));
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     const ids = layout.cards.map((c) => c.personId);
     const counts = new Map<string, number>();
     for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
@@ -123,7 +132,30 @@ b,B,,,f;y`;
 
   it('nothing is left unplaced — the shared union is rendered once, not dropped', () => {
     const model = buildModel(parseCsv(CSV));
-    const layout = layoutTree(model);
+    const layout = layoutTree(model, DEFAULT_METRICS);
     expect(unplacedIds(model, layout)).toEqual([]);
+  });
+});
+
+describe('metrics parameterization', () => {
+  it('a larger generation gap moves children further down', () => {
+    const csv = `${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa`;
+    const wide = layoutTree(buildModel(parseCsv(csv)), { ...DEFAULT_METRICS, genGap: 200 });
+    const base = layoutTree(buildModel(parseCsv(csv)), DEFAULT_METRICS);
+    const kY = (r: typeof base) => r.cards.find((c) => c.personId === 'k1')!.y;
+    expect(kY(wide) - kY(base)).toBe(200 - DEFAULT_METRICS.genGap);
+  });
+
+  it('a larger sibling gap widens the canvas', () => {
+    const csv = `${H}\nma,Ma,,pa,\npa,Pa,,,\nk1,K1,,,ma;pa\nk2,K2,,,ma;pa\nk3,K3,,,ma;pa`;
+    const wide = layoutTree(buildModel(parseCsv(csv)), { ...DEFAULT_METRICS, siblingGap: 100 });
+    const base = layoutTree(buildModel(parseCsv(csv)), DEFAULT_METRICS);
+    expect(wide.width).toBe(base.width + 2 * (100 - DEFAULT_METRICS.siblingGap));
+  });
+
+  it('connector style flows through to path generation', () => {
+    const csv = `${H}\nma,Ma,,,\nk1,K1,,,ma`;
+    const straight = layoutTree(buildModel(parseCsv(csv)), { ...DEFAULT_METRICS, connectorStyle: 'straight' });
+    for (const d of straight.connectors) expect(d).not.toContain('Q'); // no elbow arcs
   });
 });

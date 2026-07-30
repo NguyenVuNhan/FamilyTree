@@ -22,8 +22,9 @@ test('E2E-10: keyboard-only walkthrough (UC-11)', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-expanded="true"]')).toHaveCount(0);
 
-  // toolbar toggle operable by keyboard
-  await page.getByRole('button', { name: 'Name' }).focus();
+  // settings toggle operable by keyboard
+  await page.getByRole('button', { name: 'Layout settings' }).click();
+  await page.getByTestId('settings-panel').getByRole('button', { name: 'Name', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(card(page, 'robert').getByText('Robert Ellis')).toBeVisible();
 });

@@ -1,5 +1,6 @@
 import type { FamilyModel, Person, PersonRow, Union } from './types';
 import { resolveImage } from './image-source';
+import { parseGender } from './gender';
 
 const unionId = (partners: string[]) => `u:${[...partners].sort().join('+')}`;
 
@@ -7,10 +8,12 @@ export function buildModel(rows: PersonRow[]): FamilyModel {
   const persons = new Map<string, Person>();
   for (const row of rows) {
     const img = resolveImage(row.image);
+    const gender = parseGender(row.gender);
     persons.set(row.id, {
       id: row.id,
       fullName: row.fullName,
       ...(img.kind === 'src' ? { imageSrc: img.src } : {}),
+      ...(gender ? { gender } : {}),
     });
   }
 
