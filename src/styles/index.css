@@ -41,8 +41,8 @@ body { background: #f6f7f9; color: #1a202c; }
 }
 .person-name {
   font-family: 'Be Vietnam Pro', Inter, system-ui, sans-serif;
-  font-size: 13.5px; font-weight: 600; text-align: center; color: #1a202c;
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13.5px; font-weight: 600; line-height: 20px; text-align: center; color: #1a202c;
+  max-width: 100%; overflow-wrap: break-word;
 }
 
 .toolbar {

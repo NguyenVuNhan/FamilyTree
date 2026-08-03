@@ -14,6 +14,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { Toolbar } from './Toolbar';
 import { TreeCanvas } from './TreeCanvas';
 import { useFamilyData } from './use-family-data';
+import { useNameLines } from './use-name-lines';
 
 const LINK_ERROR_HINT = 'Check the link you were given, or ask the person who shared it for a new one.';
 
@@ -81,9 +82,14 @@ function FamilyApp({ source }: { source: ResolvedSource }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const names = useMemo(
+    () => (data.status === 'ready' ? [...data.model.persons.values()].map((p) => p.fullName) : []),
+    [data],
+  );
+  const nameLines = useNameLines(names, settings);
   const layout = useMemo(
-    () => (data.status === 'ready' ? layoutTree(data.model, layoutMetrics(settings)) : null),
-    [data, settings],
+    () => (data.status === 'ready' ? layoutTree(data.model, layoutMetrics(settings, nameLines)) : null),
+    [data, settings, nameLines],
   );
 
   // Never a silently wrong tree (spec §6): if the single-root layout walk couldn't
