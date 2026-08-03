@@ -37,3 +37,25 @@ describe('decodeView', () => {
     expect(decodeView('')).toEqual(DEFAULT_SETTINGS);
   });
 });
+
+describe('print view keys (UC-90..92)', () => {
+  it('encodes only non-default print fields', () => {
+    const settings = { ...DEFAULT_SETTINGS, arrangement: 'flow' as const, theme: 'inkwash' as const, marginMm: 50, frameGuide: true };
+    expect(encodeView(settings)).toBe('arr:flow,theme:inkwash,mgn:50,guide:1');
+  });
+  it('custom format round-trips as WxH mm', () => {
+    const settings = { ...DEFAULT_SETTINGS, format: 'custom' as const, customWmm: 1000, customHmm: 700 };
+    const encoded = encodeView(settings)!;
+    expect(encoded).toContain('fmt:1000x700');
+    expect(decodeView(encoded)).toMatchObject({ format: 'custom', customWmm: 1000, customHmm: 700 });
+  });
+  it('decode: garbage degrades per-field (UC-92)', () => {
+    expect(decodeView('arr:banana,theme:inkwash,fmt:9999x1,mgn:500,guide:2')).toMatchObject({
+      arrangement: 'topDown', theme: 'inkwash', format: 'pano', marginMm: 60, frameGuide: false,
+    });
+  });
+  it('full round-trip', () => {
+    const settings = { ...DEFAULT_SETTINGS, arrangement: 'flow' as const, theme: 'botanical' as const, format: 'square' as const, frameGuide: true };
+    expect(decodeView(encodeView(settings)!)).toEqual(settings);
+  });
+});

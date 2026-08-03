@@ -1,3 +1,4 @@
+import { parseCustomFmt } from '../print/formats';
 import { DEFAULT_SETTINGS, sanitizeSettings, type LayoutSettings } from './settings';
 
 /** URL key ↔ settings field, in canonical encode order. `arch` is the URL alias for archCard. */
@@ -11,6 +12,9 @@ const FIELDS = [
   ['gen', 'genGap'],
   ['conn', 'connectorStyle'],
   ['ph', 'placeholderStyle'],
+  ['arr', 'arrangement'],
+  ['theme', 'theme'],
+  ['mgn', 'marginMm'],
 ] as const;
 
 const toUrl = (v: string | number) => (v === 'archCard' ? 'arch' : String(v));
@@ -20,6 +24,10 @@ const fromUrl = (v: string) => (v === 'arch' ? 'archCard' : v);
 export function encodeView(s: LayoutSettings): string | null {
   const pairs = FIELDS.filter(([, field]) => s[field] !== DEFAULT_SETTINGS[field])
     .map(([key, field]) => `${key}:${toUrl(s[field])}`);
+  if (s.format !== DEFAULT_SETTINGS.format) {
+    pairs.push(`fmt:${s.format === 'custom' ? `${s.customWmm}x${s.customHmm}` : s.format}`);
+  }
+  if (s.frameGuide) pairs.push('guide:1');
   return pairs.length > 0 ? pairs.join(',') : null;
 }
 
@@ -29,10 +37,27 @@ export function decodeView(raw: string): LayoutSettings {
   for (const part of raw.split(',')) {
     const i = part.indexOf(':');
     if (i <= 0) continue;
-    const field = FIELDS.find(([key]) => key === part.slice(0, i))?.[1];
+    const key = part.slice(0, i);
+    const value = part.slice(i + 1);
+    if (key === 'fmt') {
+      const custom = parseCustomFmt(value);
+      if (custom) {
+        partial.format = 'custom';
+        partial.customWmm = custom.wMm;
+        partial.customHmm = custom.hMm;
+      } else {
+        partial.format = value; // preset id or junk — sanitize decides
+      }
+      continue;
+    }
+    if (key === 'guide') {
+      partial.frameGuide = value === '1';
+      continue;
+    }
+    const field = FIELDS.find(([k]) => k === key)?.[1];
     if (!field) continue;
-    const value = fromUrl(part.slice(i + 1));
-    partial[field] = /^\d+$/.test(value) ? Number(value) : value;
+    const v = fromUrl(value);
+    partial[field] = /^\d+$/.test(v) ? Number(v) : v;
   }
   return sanitizeSettings({ ...DEFAULT_SETTINGS, ...partial });
 }
