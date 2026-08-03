@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { serveCsv, card } from './helpers';
+import { card, gotoSrc, serveCsv } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await page.route('https://img.example/**', (r) => r.abort()); // avatar fallback path is fine
   await serveCsv(page, { fixtureName: 'standard.csv' });
-  await page.goto('/?family=alpha');
+  await gotoSrc(page);
 });
 
 test('E2E-01: standard fixture renders everyone, connectors, centered (UC-1, UC-18)', async ({ page }) => {

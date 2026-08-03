@@ -11,6 +11,11 @@ export default tseslint.config(
     files: ['**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     rules: reactHooks.configs.recommended.rules,
-    languageOptions: { globals: { ...globals.browser, __FAMILY_ENV__: 'readonly' } },
+    languageOptions: { globals: { ...globals.browser } },
+  },
+  {
+    // Standalone Node scripts (e.g. the e2e fixture server) run outside the browser bundle.
+    files: ['**/*.{js,mjs,cjs}'],
+    languageOptions: { globals: globals.node },
   },
 );

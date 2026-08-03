@@ -1,16 +1,16 @@
+// src/components/use-family-data.ts
 import { useEffect, useState } from 'react';
-import { DEMO_KEY, type Family } from '../config/families';
 import type { FamilyModel, Issue } from '../data/types';
 import { parseStaircase, UnreadableSheetError } from '../data/staircase-parser';
 import { validateRows } from '../data/validate';
 import { buildModel } from '../data/build-model';
-import { families } from '../config';
 
 export type DataState =
   | { status: 'loading' }
-  | { status: 'ready'; model: FamilyModel; warnings: Issue[]; source: 'live' | 'fallback'; fallbackReason?: 'no-config' | 'load-failed' | 'unreadable' }
+  | { status: 'ready'; model: FamilyModel; warnings: Issue[] }
   | { status: 'invalid'; errors: Issue[] }
-  | { status: 'empty' };
+  | { status: 'empty' }
+  | { status: 'failed'; reason: 'load-failed' | 'unreadable' };
 
 function process(text: string): DataState {
   const { rows, errors, warnings: parseWarnings } = parseStaircase(text);
@@ -26,39 +26,37 @@ function process(text: string): DataState {
       message: `Not connected to the main family and not shown: ${model.excludedIds.map((id) => nameOf.get(id) ?? id).join(', ')}`,
     });
   }
-  return { status: 'ready', model, warnings, source: 'live' };
+  return { status: 'ready', model, warnings };
 }
 
-export function useFamilyData(family: Family, isOnlyDemo: boolean): DataState {
+/** Fetches and parses exactly the given CSV URL. Explicit sources never fall
+ *  back to demo data — a failure is reported as `failed` and rendered honestly. */
+export function useFamilyData(csvUrl: string): DataState {
   const [state, setState] = useState<DataState>({ status: 'loading' });
+  // Reset to loading during render (not inside the effect) when csvUrl changes,
+  // per React's "adjusting state when a prop changes" pattern — avoids a
+  // synchronous setState-in-effect that would cascade an extra commit.
+  const [loadedFor, setLoadedFor] = useState(csvUrl);
+  if (csvUrl !== loadedFor) {
+    setLoadedFor(csvUrl);
+    setState({ status: 'loading' });
+  }
 
   useEffect(() => {
     let alive = true;
-    const done = (s: DataState) => { if (alive) setState(s); };
     (async () => {
-      let reason: 'load-failed' | 'unreadable';
+      let next: DataState;
       try {
-        const res = await fetch(family.csvUrl);
+        const res = await fetch(csvUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const result = process(await res.text());
-        if (result.status === 'ready' && family.key === DEMO_KEY && isOnlyDemo) {
-          return done({ ...result, source: 'fallback', fallbackReason: 'no-config' });
-        }
-        return done(result);
+        next = process(await res.text());
       } catch (e) {
-        reason = e instanceof UnreadableSheetError ? 'unreadable' : 'load-failed';
+        next = { status: 'failed', reason: e instanceof UnreadableSheetError ? 'unreadable' : 'load-failed' };
       }
-      try {
-        const demoUrl = families.find((f) => f.key === DEMO_KEY)!.csvUrl; // demo always exists
-        const result = process(await (await fetch(demoUrl)).text());
-        if (result.status === 'ready') return done({ ...result, source: 'fallback', fallbackReason: reason });
-        return done(result);
-      } catch {
-        return done({ status: 'invalid', errors: [{ message: 'Could not load any family data.' }] });
-      }
+      if (alive) setState(next);
     })();
     return () => { alive = false; };
-  }, [family.key, family.csvUrl, isOnlyDemo]);
+  }, [csvUrl]);
 
   return state;
 }

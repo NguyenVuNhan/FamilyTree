@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { card, scaleOf, serveCsv, translateOf } from './helpers';
+import { card, gotoSrc, scaleOf, serveCsv, translateOf } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await page.route('https://img.example/**', (r) => r.abort()); // avatar fallback path is fine
   await serveCsv(page, { fixtureName: 'standard.csv' });
-  await page.goto('/?family=alpha');
+  await gotoSrc(page);
   await expect(card(page, 'r2')).toBeVisible();
 });
 

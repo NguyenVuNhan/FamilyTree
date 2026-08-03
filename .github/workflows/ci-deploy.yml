@@ -34,14 +34,6 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report
-      # Exported AFTER test:e2e so the hermetic :5173/:5174 e2e servers (see
-      # playwright.config.ts / vite.config.ts) never see real FAMILY_TREE_* repo
-      # variables — only the production build below should observe them.
-      - name: Export FAMILY_TREE_* repo variables
-        env:
-          VARS_JSON: ${{ toJSON(vars) }}
-        run: |
-          echo "$VARS_JSON" | jq -r 'to_entries[] | select(.key | startswith("FAMILY_TREE_")) | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main'

@@ -134,3 +134,48 @@ body { background: #f6f7f9; color: #1a202c; }
   .avatar-fallback { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #fff; }
 }
+
+/* Load dialog (no-params landing) */
+.load-dialog-backdrop {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  background: rgb(16 24 40 / 0.35); z-index: 30;
+}
+.load-dialog {
+  display: flex; flex-direction: column; gap: 14px;
+  width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto;
+  background: #fff; border-radius: 16px; padding: 28px;
+  box-shadow: 0 8px 40px rgb(16 24 40 / 0.18);
+}
+.load-dialog h1 { font-family: 'Be Vietnam Pro', Inter, sans-serif; font-size: 22px; font-weight: 600; }
+.load-dialog p { font-size: 14px; color: #4a5568; }
+.load-dialog form { display: flex; flex-direction: column; gap: 12px; }
+.load-dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.load-dialog label .optional { font-weight: 400; color: #718096; }
+.load-dialog input {
+  border: 1px solid #d5dae2; border-radius: 8px; padding: 9px 11px;
+  font-size: 14px; font-weight: 400; width: 100%;
+}
+.load-dialog [data-testid='link-input-error'] { color: #b42318; font-size: 13px; }
+.load-dialog button.primary {
+  background: #1a202c; color: #fff; border: none; border-radius: 8px;
+  padding: 10px 14px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.saved-families { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.saved-families li { display: flex; align-items: stretch; gap: 6px; }
+.saved-families .saved-family {
+  flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  background: #f6f7f9; border: 1px solid #e9ecf1; border-radius: 10px;
+  padding: 8px 12px; cursor: pointer; text-align: left;
+}
+.saved-families .saved-family span { font-size: 12px; color: #718096; }
+.saved-families li > button:last-child { border: none; background: none; cursor: pointer; font-size: 16px; color: #718096; }
+.demo-hint { text-align: center; }
+.demo-hint a { color: #4a5568; text-decoration: underline; }
+
+/* Share-link button in the toolbar */
+.share-link { display: inline-flex; align-items: center; gap: 6px; }
+.share-link [data-testid='copy-confirmation'] { font-size: 12px; color: #4a5568; }
+.share-link input {
+  width: 240px; border: 1px solid #d5dae2; border-radius: 6px;
+  padding: 4px 8px; font-size: 12px;
+}

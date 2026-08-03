@@ -1,11 +1,13 @@
+// src/components/App.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { families } from '../config';
-import { resolveFamily } from '../config/families';
+import { loadSaved, upsertSaved } from '../config/registry';
+import { resolveSource, type ResolvedSource } from '../config/source';
 import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
 import { loadSettings, saveSettings, type LayoutSettings } from '../settings/settings';
 import { ErrorPanel } from './ErrorPanel';
+import { LoadFamilyDialog } from './LoadFamilyDialog';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
 import { SampleDataBanner } from './SampleDataBanner';
 import { SettingsPanel } from './SettingsPanel';
@@ -13,25 +15,32 @@ import { Toolbar } from './Toolbar';
 import { TreeCanvas } from './TreeCanvas';
 import { useFamilyData } from './use-family-data';
 
+const LINK_ERROR_HINT = 'Check the link you were given, or ask the person who shared it for a new one.';
+
+const FAILED_MESSAGES = {
+  'load-failed': "This link's sheet couldn't be loaded — it may be unpublished, offline, or blocked.",
+  unreadable: "This link didn't return a readable sheet — the spreadsheet may no longer be published (File → Share → Publish to web).",
+} as const;
+
 export default function App() {
-  const param = new URLSearchParams(window.location.search).get('family');
-  const family = resolveFamily(families, param);
-  if (!family) {
+  const resolution = resolveSource(window.location.search, import.meta.env.BASE_URL);
+  if (resolution.status === 'none') {
+    return <LoadFamilyDialog saved={loadSaved()} navigate={(search) => window.location.assign(search)} />;
+  }
+  if (resolution.status === 'error') {
     return (
-      <main data-testid="family-not-found" className="center-screen">
-        <h1>Family not found</h1>
-        <p>There is no family tree at this address. Check the link you were given.</p>
+      <main className="center-screen">
+        <ErrorPanel title="This link doesn't work" hint={LINK_ERROR_HINT} demoLink
+          errors={[{ message: resolution.message }]} />
       </main>
     );
   }
-  return <FamilyApp familyKey={family.key} />;
+  return <FamilyApp source={resolution.source} />;
 }
 
-function FamilyApp({ familyKey }: { familyKey: string }) {
-  const family = families.find((f) => f.key === familyKey)!;
-  const isOnlyDemo = families.length === 1;
-  const data = useFamilyData(family, isOnlyDemo);
-  const [settings, setSettings] = useState(() => loadSettings(family.key));
+function FamilyApp({ source }: { source: ResolvedSource }) {
+  const data = useFamilyData(source.csvUrl);
+  const [settings, setSettings] = useState(() => loadSettings(source.settingsKey));
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [scalePct, setScalePct] = useState(100);
@@ -40,10 +49,27 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
 
   const changeSettings = (s: LayoutSettings) => {
     setSettings(s);
-    saveSettings(family.key, s);
+    saveSettings(source.settingsKey, s);
   };
 
-  useEffect(() => { document.title = `${family.displayName} — Family Tree`; }, [family.displayName]);
+  const shareLink = `${window.location.origin}${window.location.pathname}${source.canonicalSearch}`;
+
+  useEffect(() => { document.title = `${source.displayName} — Family Tree`; }, [source.displayName]);
+
+  // Save to the registry only after the sheet actually loads — failed links
+  // never pollute the saved list; the demo (registryKey null) is never saved.
+  // A re-open via a link with NO explicit name must not clobber an existing
+  // entry's name/search back to the fallback title — only bump savedAt.
+  useEffect(() => {
+    if (data.status === 'ready' && source.registryKey) {
+      const existing = loadSaved().find((f) => f.key === source.registryKey);
+      const named = source.canonicalSearch !== source.registryKey;
+      upsertSaved(named || !existing
+        ? { key: source.registryKey, name: source.displayName, search: source.canonicalSearch }
+        : { key: existing.key, name: existing.name, search: existing.search });
+    }
+  }, [data.status, source]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -85,12 +111,21 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
   if (data.status === 'loading') return <main className="center-screen" data-testid="loading"><div className="spinner" aria-label="Loading" /></main>;
   if (data.status === 'invalid') return <main className="center-screen"><ErrorPanel errors={data.errors} /></main>;
   if (data.status === 'empty') return <main className="center-screen" data-testid="empty-state"><h1>No people found</h1><p>The sheet has no rows yet — add people and refresh.</p></main>;
+  if (data.status === 'failed') {
+    return (
+      <main className="center-screen">
+        <ErrorPanel title="This tree couldn't be loaded" hint="Refresh to try again." demoLink
+          errors={[{ message: FAILED_MESSAGES[data.reason] }]} />
+      </main>
+    );
+  }
 
   return (
     <div className="app">
       <Toolbar
-        title={family.displayName}
+        title={source.displayName}
         scalePct={scalePct}
+        shareLink={shareLink}
         onZoomIn={() => viewport.current?.zoomIn()}
         onZoomOut={() => viewport.current?.zoomOut()}
         onFit={() => viewport.current?.fit()}
@@ -99,8 +134,8 @@ function FamilyApp({ familyKey }: { familyKey: string }) {
         onToggleSettings={() => setPanelOpen((o) => !o)}
       />
       {panelOpen && <SettingsPanel settings={settings} onChange={changeSettings} />}
-      {data.source === 'fallback' && !bannerDismissed && data.fallbackReason && (
-        <SampleDataBanner reason={data.fallbackReason} onDismiss={() => setBannerDismissed(true)} />
+      {source.kind === 'demo' && !bannerDismissed && (
+        <SampleDataBanner onDismiss={() => setBannerDismissed(true)} />
       )}
       {warnings.length > 0 && (
         <div className="warnings" data-testid="warnings">

@@ -1,6 +1,6 @@
 # Family Tree
 
-A visually premium, view-only family tree web app. Viewers explore the tree on a pan/zoom canvas — Photo | Name toggle, click-to-expand cards, print support. An admin maintains the data in a public Google Sheet; there is no backend, no auth, and no redeploy needed for data updates. The app hosts multiple families (one published sheet each), selected by a `?family=` URL parameter, and deploys to GitHub Pages via GitHub Actions, with a post-deploy smoke suite verifying the live site against bundled demo data.
+A visually premium, view-only family tree web app. Viewers explore the tree on a pan/zoom canvas — Photo | Name toggle, click-to-expand cards, print support. An admin maintains the data in a public Google Sheet; there is no backend, no auth, and no redeploy needed for data updates. The app renders any published Google Sheet (or any CSV URL) directly from the link — no rebuild, no configuration. Open the site, paste your published-sheet link, and share the resulting URL. It deploys to GitHub Pages via GitHub Actions, with a post-deploy smoke suite verifying the live site against bundled demo data.
 
 ## Admin guide
 
@@ -28,7 +28,7 @@ Rules:
 
 Mistakes (a row in two columns, a child more than one step deeper than its parent) show a friendly error on the page with the exact row number — fix the sheet and refresh.
 
-**Migrating an older sheet:** sheets using the previous ID-based format (`ID` / `FullName` / `PartnerID` / `ParentIDs` columns) no longer work and must be converted to the staircase layout above. Until converted, the page shows a sheet error (or falls back to the built-in demo data).
+**Migrating an older sheet:** sheets using the previous ID-based format (`ID` / `FullName` / `PartnerID` / `ParentIDs` columns) no longer work and must be converted to the staircase layout above. Until converted, the page shows a sheet error (no demo fallback — the error names the exact rows to fix).
 
 ### Layout settings
 
@@ -37,12 +37,26 @@ what cards show (Full / Name / Avatar), name position, placeholder style (initia
 silhouettes), connector shape, and spacing sliders. Choices are saved per family in your browser
 (localStorage) and apply instantly; Reset restores the defaults.
 
-### Publishing your sheet
+### Publishing and sharing your sheet
 
 1. In Google Sheets: **File → Share → Publish to web**, format **CSV**.
-2. Copy the published URL.
-3. Set it as that family's `FAMILY_TREE_URL_<NAME>` repo variable (see [Adding a family](#adding-a-family) below) — one time only.
-4. Subsequent sheet edits go live on page refresh — no redeploy needed.
+2. Open the app's bare URL — a dialog asks for your link. Paste the published URL (any form works: the `pub?output=csv` link, the `pubhtml` link, or just the `2PACX-…` ID), optionally give the family a display name, and hit **View the tree**.
+3. Copy the shareable link with the link button in the toolbar and send it to the family. The link is self-contained — anyone who opens it sees the tree.
+4. Subsequent sheet edits go live on page refresh — no redeploy, no configuration.
+
+Families you have viewed successfully are remembered in your browser and offered as one-click shortcuts on the bare URL.
+
+#### Link reference
+
+| URL | Meaning |
+|---|---|
+| `?sheet=<2PACX-id>` | A published Google Sheet by its publish ID |
+| `?sheet=<2PACX-id>&gid=<n>` | A specific tab of a multi-tab published sheet |
+| `?src=<https CSV url>` | Any CSV file on any HTTPS host |
+| `&name=<display name>` | Optional display name (toolbar heading + page title) |
+| `?family=demo` | The bundled demo family |
+
+If a shared link stops working (the panel says the sheet couldn't be loaded), the sheet was most likely unpublished — re-publish it (File → Share → Publish to web).
 
 ### Image rules
 
@@ -56,16 +70,6 @@ The `Image` column accepts:
 - Google Sheets caps cells at 50,000 chars → base64 images must be ≤ ~35 KB (thumbnail-size). Larger images: use URLs.
 
 To turn a photo into base64 text for the `Image` cell: use any "image to base64" web converter, copy the text output into the `Image` cell.
-
-## Adding a family
-
-1. Create two repo Variables (Settings → Secrets and variables → Actions → Variables) for the new family:
-   - `FAMILY_TREE_URL_<NAME>` — the family's published sheet CSV URL
-   - `FAMILY_TREE_NAME_<NAME>` — the human display name shown in the toolbar and page title
-2. Re-run the `CI & Deploy` workflow (or push/merge to `main`) so the site rebuilds with the new family baked in.
-3. Share the family's URL: `https://<owner>.github.io/<repo>/?family=<name>` (`<name>` is `<NAME>` lowercased).
-
-The reserved `demo` family is always present. A repo variable pair named `DEMO` (`FAMILY_TREE_URL_DEMO` / `FAMILY_TREE_NAME_DEMO`) collides with it and **fails the build**.
 
 ## Deployment
 
@@ -95,4 +99,4 @@ Run these by hand before/after a release — they aren't automatable in CI:
 - [ ] Real print dialog output on A4 and Letter paper, landscape orientation
 - [ ] Google Sheets publish-to-web round-trip with a live sheet (edit a cell, confirm it appears on refresh with no redeploy)
 - [ ] Staircase round-trip with a live sheet: add a person under a parent, refresh, confirm placement; make a deliberate depth-jump mistake, confirm the row-numbered error
-- [ ] Adding a family via repo Variables end-to-end (create the two variables, re-run the workflow, open the shared URL)
+- [ ] Paste-to-share round-trip with a live sheet: publish a real sheet, paste its URL into the dialog, copy the share link from the toolbar, open it in a private window, confirm the tree renders

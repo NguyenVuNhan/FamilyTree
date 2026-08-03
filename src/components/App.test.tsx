@@ -1,42 +1,138 @@
+// src/components/App.test.tsx
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
+import { REGISTRY_STORAGE_KEY } from '../config/registry';
 
 const DEMO_CSV = 'Đời 1,Đời 2,Image\nMa Ellis + Pa Ellis,,\n,Kid Ellis,';
+const SRC_URL = 'https://sheets.example/a.csv';
+const SRC_SEARCH = `?${new URLSearchParams({ src: SRC_URL, name: 'Alpha Family' })}`;
 
 const okFetch = () => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => DEMO_CSV }) as Response));
 const setUrl = (search: string) => window.history.replaceState({}, '', `/${search}`);
 afterEach(() => { vi.unstubAllGlobals(); setUrl(''); localStorage.clear(); });
 
-// With no FAMILY_TREE_* env in tests, the registry contains only demo.
 describe('App', () => {
-  it('renders the tree with the family display name and title', async () => {
+  it('no params → load dialog, no fetch, no tree', () => {
+    okFetch();
+    render(<App />);
+    expect(screen.getByTestId('load-dialog')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(document.querySelector('.person-card')).toBeNull();
+  });
+
+  it('?family=demo renders the tree with title and demo banner; dismissible', async () => {
+    setUrl('?family=demo');
     okFetch();
     render(<App />);
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Demo Family' })).toBeInTheDocument());
     expect(document.title).toBe('Demo Family — Family Tree');
-    expect(screen.getAllByRole('button', { name: /Ellis/ }).length).toBeGreaterThan(0);
-    expect(screen.getByTestId('sample-banner')).toHaveTextContent(/no family sheets/i);
-  });
-
-  it('dismisses the banner', async () => {
-    okFetch();
-    render(<App />);
-    await waitFor(() => screen.getByTestId('sample-banner'));
+    expect(screen.getByTestId('sample-banner')).toHaveTextContent(/sample data/i);
     await userEvent.click(screen.getByRole('button', { name: /dismiss/i }));
     expect(screen.queryByTestId('sample-banner')).not.toBeInTheDocument();
   });
 
-  it('unknown ?family → not-found state without listing names', async () => {
+  it('demo is never saved to the registry', async () => {
+    setUrl('?family=demo');
+    okFetch();
+    render(<App />);
+    await waitFor(() => screen.getByRole('heading', { name: 'Demo Family' }));
+    expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBeNull();
+  });
+
+  it('?src= renders with the given name, no banner, share button, and saves to the registry', async () => {
+    setUrl(SRC_SEARCH);
+    okFetch();
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Alpha Family' })).toBeInTheDocument());
+    expect(document.title).toBe('Alpha Family — Family Tree');
+    expect(screen.queryByTestId('sample-banner')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy share link' })).toBeInTheDocument();
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(REGISTRY_STORAGE_KEY)!) as Array<{ key: string; name: string; search: string }>;
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toMatchObject({
+        key: `?${new URLSearchParams({ src: SRC_URL })}`,
+        name: 'Alpha Family',
+        search: SRC_SEARCH,
+      });
+    });
+  });
+
+  it('re-opening a saved source with no ?name= keeps the existing name/search, only refreshing savedAt', async () => {
+    const key = `?${new URLSearchParams({ src: SRC_URL })}`;
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify([
+      { key, name: 'Alpha Family', search: SRC_SEARCH, savedAt: 1000 },
+    ]));
+    setUrl(`?${new URLSearchParams({ src: SRC_URL })}`); // no &name=
+    okFetch();
+    render(<App />);
+    // The page itself shows the fallback title (no ?name= was given) — only the
+    // registry entry is expected to retain the previously-saved name.
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Family Tree' })).toBeInTheDocument());
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(REGISTRY_STORAGE_KEY)!) as Array<{ key: string; name: string; search: string; savedAt: number }>;
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toMatchObject({ key, name: 'Alpha Family', search: SRC_SEARCH });
+      expect(saved[0].savedAt).toBeGreaterThan(1000);
+    });
+  });
+
+  it('re-opening a saved source WITH ?name= renames the entry', async () => {
+    const key = `?${new URLSearchParams({ src: SRC_URL })}`;
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify([
+      { key, name: 'Alpha Family', search: SRC_SEARCH, savedAt: 1000 },
+    ]));
+    const newSearch = `?${new URLSearchParams({ src: SRC_URL, name: 'New Name' })}`;
+    setUrl(newSearch);
+    okFetch();
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'New Name' })).toBeInTheDocument());
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(REGISTRY_STORAGE_KEY)!) as Array<{ key: string; name: string; search: string }>;
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toMatchObject({ key, name: 'New Name', search: newSearch });
+    });
+  });
+
+  it('unknown ?family → link-error panel with demo link, nothing saved', () => {
     setUrl('?family=nope');
     okFetch();
     render(<App />);
-    expect(await screen.findByTestId('family-not-found')).toBeInTheDocument();
-    expect(screen.queryByText(/demo/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('error-panel')).toHaveTextContent(/no family tree at this address/i);
+    expect(screen.getByRole('link', { name: /demo family/i })).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('non-https src → link-error panel, no fetch', () => {
+    setUrl(`?${new URLSearchParams({ src: 'http://evil.example/a.csv' })}`);
+    okFetch();
+    render(<App />);
+    expect(screen.getByTestId('error-panel')).toHaveTextContent(/https:\/\/ address/i);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('fetch failure → could-not-load panel with demo link; nothing saved', async () => {
+    setUrl(SRC_SEARCH);
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('network'); }));
+    render(<App />);
+    expect(await screen.findByTestId('error-panel')).toHaveTextContent(/couldn't be loaded/i);
+    expect(screen.getByRole('link', { name: /demo family/i })).toBeInTheDocument();
+    expect(localStorage.getItem(REGISTRY_STORAGE_KEY)).toBeNull();
+  });
+
+  it('shows the sheet-error panel for invalid data (default copy)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true, text: async () => 'Đời 1,Đời 2,Image\n,Orphan Kid,',
+    }) as Response));
+    setUrl('?family=demo');
+    render(<App />);
+    expect(await screen.findByTestId('error-panel')).toHaveTextContent(/must start in/);
   });
 
   it('only one card expands at a time; Esc collapses', async () => {
+    setUrl('?family=demo');
     okFetch();
     render(<App />);
     await waitFor(() => screen.getAllByRole('button', { name: /Ellis/ }));
@@ -49,6 +145,7 @@ describe('App', () => {
   });
 
   it('reflects zoom-in/out from the viewport in the toolbar percentage (no stale %)', async () => {
+    setUrl('?family=demo');
     okFetch();
     render(<App />);
     await waitFor(() => screen.getByTestId('zoom-pct'));
@@ -57,16 +154,8 @@ describe('App', () => {
     expect(screen.getByTestId('zoom-pct').textContent).not.toBe(initialPct);
   });
 
-  it('shows the error panel for invalid data', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true, text: async () => 'Đời 1,Đời 2,Image\n,Orphan Kid,',
-    }) as Response));
+  it('gear opens the settings panel; changing card style re-renders and persists under the source key', async () => {
     setUrl('?family=demo');
-    render(<App />);
-    expect(await screen.findByTestId('error-panel')).toHaveTextContent(/must start in/);
-  });
-
-  it('gear opens the settings panel; changing card style re-renders and persists', async () => {
     okFetch();
     render(<App />);
     await waitFor(() => screen.getAllByRole('button', { name: /Ellis/ }));
@@ -77,6 +166,7 @@ describe('App', () => {
   });
 
   it('Escape closes the settings panel', async () => {
+    setUrl('?family=demo');
     okFetch();
     render(<App />);
     await waitFor(() => screen.getAllByRole('button', { name: /Ellis/ }));
@@ -88,6 +178,7 @@ describe('App', () => {
 
   it('saved settings are loaded on mount', async () => {
     localStorage.setItem('ft:layout:demo', JSON.stringify({ contentMode: 'name' }));
+    setUrl('?family=demo');
     okFetch();
     render(<App />);
     await waitFor(() => screen.getByText('Ma Ellis')); // name mode renders names
