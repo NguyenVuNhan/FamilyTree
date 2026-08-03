@@ -72,8 +72,12 @@ describe('LoadFamilyDialog', () => {
     expect(items[0]).toHaveTextContent(/google sheet/i);  // subtitle for sheet entries
     expect(items[1]).toHaveTextContent('x.example');      // subtitle for src entries: host
 
-    await userEvent.click(within(items[0]).getByRole('button', { name: /smith family/i }));
+    // Main button is disambiguated by subtitle text (unique to the view button, not remove)
+    await userEvent.click(within(items[0]).getByRole('button', { name: /google sheet/i }));
     expect(navigate).toHaveBeenCalledWith(`?sheet=${ID}&name=Smith+Family`);
+
+    // Verify remove button has correct accessible name
+    expect(within(items[0]).getByRole('button', { name: 'Remove Smith Family' })).toBeInTheDocument();
 
     await userEvent.click(within(items[1]).getByRole('button', { name: 'Remove Alpha' }));
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument();

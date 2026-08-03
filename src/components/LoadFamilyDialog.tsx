@@ -56,11 +56,11 @@ export function LoadFamilyDialog({ saved: initialSaved, navigate }: {
           <ul data-testid="saved-families" className="saved-families">
             {saved.map((f) => (
               <li key={f.key}>
-                <button type="button" className="saved-family" aria-label={f.name} onClick={() => navigate(f.search)}>
+                <button type="button" className="saved-family" onClick={() => navigate(f.search)}>
                   <strong>{f.name}</strong>
                   <span>{subtitleFor(f.search)}</span>
                 </button>
-                <button type="button" aria-label={f.name.split(' ').length > 1 ? `Remove (${f.key})` : `Remove ${f.name}`} onClick={() => remove(f.key)}>×</button>
+                <button type="button" aria-label={`Remove ${f.name}`} onClick={() => remove(f.key)}>×</button>
               </li>
             ))}
           </ul>
