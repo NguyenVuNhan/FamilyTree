@@ -37,9 +37,17 @@ test('E2E-54: a fresh visitor sees the arch default — photo card, name underne
   await expect(page.locator('.person-card.style-classic')).toHaveCount(0);
   const name = card(page, 'r2').locator('.person-name');
   await expect(name).toHaveText('Margaret Ellis');
-  const nameBox = (await name.boundingBox())!;
-  const imgBox = (await card(page, 'r2').locator('img, .avatar-fallback').boundingBox())!;
-  expect(nameBox.y).toBeGreaterThan(imgBox.y + imgBox.height / 2); // name sits below the photo
+  // Read both rects in one evaluate on the card element — two separate
+  // boundingBox() round-trips can straddle a concurrent layout/scale change
+  // under parallel-worker CPU contention (same flake class as E2E-61).
+  const { nameY, imgY, imgHeight } = await card(page, 'r2').evaluate((cardEl) => {
+    const nameEl = cardEl.querySelector('.person-name')!;
+    const imgEl = cardEl.querySelector('img, .avatar-fallback')!;
+    const nameRect = nameEl.getBoundingClientRect();
+    const imgRect = imgEl.getBoundingClientRect();
+    return { nameY: nameRect.y, imgY: imgRect.y, imgHeight: imgRect.height };
+  });
+  expect(nameY).toBeGreaterThan(imgY + imgHeight / 2); // name sits below the photo
 });
 
 test('E2E-55: previously saved settings beat the new defaults (UC-74)', async ({ page }) => {
