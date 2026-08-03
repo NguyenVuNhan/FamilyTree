@@ -1,10 +1,10 @@
 import { expect, test, devices } from '@playwright/test';
-import { card, serveCsv } from './helpers';
+import { card, gotoSrc, serveCsv } from './helpers';
 
 test('E2E-10: keyboard-only walkthrough (UC-11)', async ({ page }) => {
   await page.route('https://img.example/**', (r) => r.abort()); // avatar fallback path is fine
   await serveCsv(page, { fixtureName: 'standard.csv' });
-  await page.goto('/?family=alpha');
+  await gotoSrc(page);
   await expect(card(page, 'r2')).toBeVisible();
 
   // Tab until a person card is focused, then Enter expands, Esc collapses
@@ -38,7 +38,7 @@ test.describe('E2E-11: mobile viewport (UC-12) — pinch stays manual', () => {
   test('tap expands, one-finger pan moves canvas, toolbar visible', async ({ page }) => {
     await page.route('https://img.example/**', (r) => r.abort()); // avatar fallback path is fine
     await serveCsv(page, { fixtureName: 'standard.csv' });
-    await page.goto('/?family=alpha');
+    await gotoSrc(page);
     await expect(page.locator('.toolbar')).toBeVisible();
     await card(page, 'r2p').tap();
     await expect(card(page, 'r2p')).toHaveAttribute('data-expanded', 'true');

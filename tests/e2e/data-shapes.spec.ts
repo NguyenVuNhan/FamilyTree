@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { card, serveCsv } from './helpers';
+import { card, gotoSrc, serveCsv } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await page.route('https://img.example/**', (r) => r.abort()); // disconnected.csv carries margaret's image URL
@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 const open = async (page: import('@playwright/test').Page, fixtureName: string) => {
   await serveCsv(page, { fixtureName });
-  await page.goto('/?family=alpha');
+  await gotoSrc(page);
 };
 const paths = (page: import('@playwright/test').Page) => page.getByTestId('connector-layer').locator('path');
 
