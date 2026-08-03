@@ -6,6 +6,7 @@ import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
 import { loadSettings, saveSettings, type LayoutSettings } from '../settings/settings';
+import { decodeView, encodeView } from '../settings/view-param';
 import { ErrorPanel } from './ErrorPanel';
 import { LoadFamilyDialog } from './LoadFamilyDialog';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
@@ -14,6 +15,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { Toolbar } from './Toolbar';
 import { TreeCanvas } from './TreeCanvas';
 import { useFamilyData } from './use-family-data';
+import { useNameLines } from './use-name-lines';
 
 const LINK_ERROR_HINT = 'Check the link you were given, or ask the person who shared it for a new one.';
 
@@ -24,6 +26,7 @@ const FAILED_MESSAGES = {
 
 export default function App() {
   const resolution = resolveSource(window.location.search, import.meta.env.BASE_URL);
+  const viewRaw = new URLSearchParams(window.location.search).get('view');
   if (resolution.status === 'none') {
     return <LoadFamilyDialog saved={loadSaved()} navigate={(search) => window.location.assign(search)} />;
   }
@@ -35,12 +38,12 @@ export default function App() {
       </main>
     );
   }
-  return <FamilyApp source={resolution.source} />;
+  return <FamilyApp source={resolution.source} linkSettings={viewRaw !== null ? decodeView(viewRaw) : null} />;
 }
 
-function FamilyApp({ source }: { source: ResolvedSource }) {
+function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSettings: LayoutSettings | null }) {
   const data = useFamilyData(source.csvUrl);
-  const [settings, setSettings] = useState(() => loadSettings(source.settingsKey));
+  const [settings, setSettings] = useState(() => linkSettings ?? loadSettings(source.settingsKey));
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [scalePct, setScalePct] = useState(100);
@@ -52,7 +55,19 @@ function FamilyApp({ source }: { source: ResolvedSource }) {
     saveSettings(source.settingsKey, s);
   };
 
-  const shareLink = `${window.location.origin}${window.location.pathname}${source.canonicalSearch}`;
+  // Link wins: a shared view is applied exactly (including sender-default fields),
+  // persisted, then ?view= is stripped so reload after a tweak doesn't snap back.
+  useEffect(() => {
+    if (linkSettings) {
+      saveSettings(source.settingsKey, linkSettings);
+      window.history.replaceState(null, '', window.location.pathname + source.canonicalSearch);
+    }
+  }, [linkSettings, source]);
+
+  const viewValue = encodeView(settings);
+  const shareLink = `${window.location.origin}${window.location.pathname}${source.canonicalSearch}${
+    viewValue !== null ? `&view=${encodeURIComponent(viewValue)}` : ''
+  }`;
 
   useEffect(() => { document.title = `${source.displayName} — Family Tree`; }, [source.displayName]);
 
@@ -81,9 +96,14 @@ function FamilyApp({ source }: { source: ResolvedSource }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const names = useMemo(
+    () => (data.status === 'ready' ? [...data.model.persons.values()].map((p) => p.fullName) : []),
+    [data],
+  );
+  const nameLines = useNameLines(names, settings);
   const layout = useMemo(
-    () => (data.status === 'ready' ? layoutTree(data.model, layoutMetrics(settings)) : null),
-    [data, settings],
+    () => (data.status === 'ready' ? layoutTree(data.model, layoutMetrics(settings, nameLines)) : null),
+    [data, settings, nameLines],
   );
 
   // Never a silently wrong tree (spec §6): if the single-root layout walk couldn't
@@ -148,7 +168,7 @@ function FamilyApp({ source }: { source: ResolvedSource }) {
         viewportRef={viewport}
         onScaleChange={setScalePct}
       >
-        <TreeCanvas model={data.model} layout={layout!} settings={settings}
+        <TreeCanvas model={data.model} layout={layout!} settings={settings} nameLines={nameLines}
           expandedId={expandedId} onToggle={(id) => setExpandedId((cur) => (cur === id ? null : id))} />
       </PanZoomViewport>
     </div>

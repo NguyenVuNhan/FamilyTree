@@ -15,7 +15,7 @@ test('E2E-27: data URI, raw base64, blank → correct rendering; stable distinct
   await expect(page.locator('[data-person-id="r2p"] img')).toHaveAttribute('src', /^data:image\/png;base64,/);
   await expect(page.locator('[data-person-id="r3"] img')).toHaveAttribute('src', /^data:image\/png;base64,/);
   const bg = (id: string) =>
-    page.locator(`[data-person-id="${id}"] [role="img"]`).evaluate((el) => getComputedStyle(el).backgroundImage);
+    page.locator(`[data-person-id="${id}"] .avatar-fallback`).evaluate((el) => getComputedStyle(el).backgroundImage);
   const b1 = await bg('r4');
   const b2 = await bg('r5');
   expect(b1).not.toBe(b2);              // distinct hues

@@ -42,6 +42,10 @@ silhouettes), connector shape, and spacing sliders. Choices are saved per family
 1. In Google Sheets: **File → Share → Publish to web**, format **CSV**.
 2. Open the app's bare URL — a dialog asks for your link. Paste the published URL (any form works: the `pub?output=csv` link, the `pubhtml` link, or just the `2PACX-…` ID), optionally give the family a display name, and hit **View the tree**.
 3. Copy the shareable link with the link button in the toolbar and send it to the family. The link is self-contained — anyone who opens it sees the tree.
+
+   The copied link also carries your current layout view (card style, spacing, …) whenever it
+   differs from the defaults, so the person opening it sees the tree exactly as you styled it.
+   Their own later tweaks are saved normally — the shared view applies once, on open.
 4. Subsequent sheet edits go live on page refresh — no redeploy, no configuration.
 
 Families you have viewed successfully are remembered in your browser and offered as one-click shortcuts on the bare URL.

@@ -41,8 +41,13 @@ body { background: #f6f7f9; color: #1a202c; }
 }
 .person-name {
   font-family: 'Be Vietnam Pro', Inter, system-ui, sans-serif;
-  font-size: 13.5px; font-weight: 600; text-align: center; color: #1a202c;
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13.5px; font-weight: 600; line-height: 20px; text-align: center; color: #1a202c;
+  max-width: 100%; overflow-wrap: break-word;
+  /* A flex item's default automatic minimum size is its min-content width, which — per spec —
+     ignores overflow-wrap/break-word. Without this, .style-photoLeft's row layout refuses to
+     shrink an unbroken long word below its min-content, overflowing the card. min-width: 0 lets
+     max-width + overflow-wrap actually govern the wrap, in every card style (row or column). */
+  min-width: 0;
 }
 
 .toolbar {
@@ -73,7 +78,7 @@ body { background: #f6f7f9; color: #1a202c; }
 
 /* circle: bare avatar, no card chrome; label floats on the canvas with a white halo for contrast */
 .person-card.style-circle { background: none; border: none; box-shadow: none; gap: 0; justify-content: flex-start; }
-.person-card.style-circle :is(img, [role='img']) { box-shadow: 0 0 0 3px var(--ring-color, #d4c4a8), 0 1px 4px rgb(16 24 40 / 0.15); }
+.person-card.style-circle :is(img, .avatar-fallback) { box-shadow: 0 0 0 3px var(--ring-color, #d4c4a8), 0 1px 4px rgb(16 24 40 / 0.15); }
 .person-card.style-circle .person-name {
   margin-top: var(--pad, 14px);
   text-shadow: 0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff, 0 0 6px #fff;
@@ -87,7 +92,7 @@ body { background: #f6f7f9; color: #1a202c; }
 
 /* photoLeft: compact horizontal card (Elvis-tree style) */
 .person-card.style-photoLeft { flex-direction: row; justify-content: flex-start; gap: 10px; border-radius: 12px; }
-.person-card.style-photoLeft :is(img, [role='img']) { border-radius: 8px; }
+.person-card.style-photoLeft :is(img, .avatar-fallback) { border-radius: 8px; }
 .person-card.style-photoLeft .person-name { text-align: left; }
 .person-card.style-photoLeft.expanded { flex-direction: column; }
 
@@ -130,7 +135,7 @@ body { background: #f6f7f9; color: #1a202c; }
   .viewport { overflow: visible; background-image: none; }
   .viewport-transform { transform: scale(var(--print-scale, 1)) !important; }
   .connector { stroke: #6b7280; }
-  .person-card, .person-card:hover { box-shadow: none; transform: none; border-color: #6b7280; }
+  .person-card, .person-card:hover { box-shadow: none; transform: none; border-color: #6b7280 !important; }
   .avatar-fallback { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #fff; }
 }

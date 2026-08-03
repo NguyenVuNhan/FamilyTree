@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, SPACING_BOUNDS, type LayoutSettings } from '../settings/settings';
-import { cardMetrics, DEFAULT_METRICS, effectiveCardStyle, layoutMetrics, MIN_CARD_SIZE } from './card-metrics';
+import { cardMetrics, DEFAULT_METRICS, effectiveCardStyle, layoutMetrics, MIN_CARD_SIZE, nameTextWidth } from './card-metrics';
 
 const s = (over: Partial<LayoutSettings> = {}): LayoutSettings => ({ ...DEFAULT_SETTINGS, ...over });
 
@@ -16,13 +16,13 @@ describe('effectiveCardStyle', () => {
 });
 
 describe('cardMetrics', () => {
-  it("default settings reproduce today's exact card size (132x150)", () => {
-    expect(cardMetrics(DEFAULT_SETTINGS)).toEqual({ cardW: 132, cardH: 150 });
+  it('default settings produce the arch-full card (132x180)', () => {
+    expect(cardMetrics(DEFAULT_SETTINGS)).toEqual({ cardW: 132, cardH: 180 });
   });
 
   it('padding grows the classic card symmetrically', () => {
-    const base = cardMetrics(s({ cardPadding: 14 }));
-    const bigger = cardMetrics(s({ cardPadding: 20 }));
+    const base = cardMetrics(s({ cardStyle: 'classic', cardPadding: 14 }));
+    const bigger = cardMetrics(s({ cardStyle: 'classic', cardPadding: 20 }));
     expect(bigger.cardW).toBe(base.cardW + 12);
     expect(bigger.cardH).toBe(base.cardH + 12);
   });
@@ -63,6 +63,34 @@ describe('layoutMetrics', () => {
   });
   it('DEFAULT_METRICS equals layoutMetrics(DEFAULT_SETTINGS)', () => {
     expect(DEFAULT_METRICS).toEqual(layoutMetrics(DEFAULT_SETTINGS));
-    expect(DEFAULT_METRICS).toMatchObject({ cardW: 132, cardH: 150, coupleGap: 28, siblingGap: 36, genGap: 90, margin: 40 });
+    expect(DEFAULT_METRICS).toMatchObject({ cardW: 132, cardH: 180, coupleGap: 28, siblingGap: 36, genGap: 90, margin: 40 });
+  });
+});
+
+describe('nameTextWidth', () => {
+  it('mirrors the CSS text box per style', () => {
+    expect(nameTextWidth(s({ cardStyle: 'classic' }))).toBe(104);            // cardW − 2·padding
+    expect(nameTextWidth(s({ cardStyle: 'archCard', cardPadding: 14 }))).toBe(112);  // cardW − 2·10px name padding
+    expect(nameTextWidth(s({ cardStyle: 'circle', cardPadding: 14 }))).toBe(132);    // label floats full card width
+    expect(nameTextWidth(s({ cardStyle: 'photoLeft' }))).toBe(118);          // 176 − photo 48 − gap 10
+    expect(nameTextWidth(s({ cardStyle: 'circle', contentMode: 'name' }))).toBe(104); // name mode renders classic
+  });
+});
+
+describe('cardMetrics with maxNameLines', () => {
+  it('each style grows by NAME_H per extra line', () => {
+    expect(cardMetrics(s({ cardStyle: 'archCard' }), 2).cardH).toBe(200);              // 180 + 20
+    expect(cardMetrics(s({ cardStyle: 'classic' }), 2).cardH).toBe(170);               // 150 + 20
+    expect(cardMetrics(s({ cardStyle: 'circle', contentMode: 'full' }), 2).cardH).toBe(126); // 72 + 14 + 40
+  });
+  it('photoLeft grows only once the name block outgrows the photo', () => {
+    expect(cardMetrics(s({ cardStyle: 'photoLeft', contentMode: 'full' }), 2).cardH).toBe(76); // max(48, 40) + 28
+    expect(cardMetrics(s({ cardStyle: 'photoLeft', contentMode: 'full' }), 3).cardH).toBe(88); // max(48, 60) + 28
+  });
+  it('avatar-only mode ignores name lines (no name is shown)', () => {
+    expect(cardMetrics(s({ contentMode: 'avatar' }), 3)).toEqual(cardMetrics(s({ contentMode: 'avatar' }), 1));
+  });
+  it('width never changes with line count', () => {
+    expect(cardMetrics(s(), 3).cardW).toBe(cardMetrics(s(), 1).cardW);
   });
 });
