@@ -64,6 +64,7 @@ test('E2E-44: fetch failure and unreadable payload → could-not-load ErrorPanel
   await page.goto(treeUrl('https://sheets.example/alpha.csv'));
   await expect(page.getByTestId('error-panel')).toContainText(/couldn't be loaded/);
   await expect(page.getByRole('link', { name: /demo family/i })).toBeVisible();
+  await expect(page.locator('.person-card')).toHaveCount(0);
 
   await serveCsv(page, { url: 'https://sheets.example/bravo.csv', body: '<!doctype html><html><body>Sorry</body></html>' });
   await page.goto(treeUrl('https://sheets.example/bravo.csv'));

@@ -36,14 +36,6 @@ export async function gotoSrc(page: Page, opts: { url?: string; name?: string } 
   await page.goto(treeUrl(opts.url ?? ALPHA_URL, opts.name ?? 'Alpha Family'));
 }
 
-/** Seed the saved-families registry before first load (schema-coupled — single place). */
-export async function seedRegistry(page: Page, entries: Array<{ key: string; name: string; search: string; savedAt: number }>) {
-  await page.addInitScript(
-    (payload: string) => localStorage.setItem('ft:families:v1', payload),
-    JSON.stringify(entries),
-  );
-}
-
 export const card = (page: Page, id: string) => page.locator(`.person-card[data-person-id="${id}"]`);
 export const transform = (page: Page) => page.getByTestId('viewport-transform');
 

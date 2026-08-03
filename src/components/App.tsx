@@ -58,9 +58,15 @@ function FamilyApp({ source }: { source: ResolvedSource }) {
 
   // Save to the registry only after the sheet actually loads — failed links
   // never pollute the saved list; the demo (registryKey null) is never saved.
+  // A re-open via a link with NO explicit name must not clobber an existing
+  // entry's name/search back to the fallback title — only bump savedAt.
   useEffect(() => {
     if (data.status === 'ready' && source.registryKey) {
-      upsertSaved({ key: source.registryKey, name: source.displayName, search: source.canonicalSearch });
+      const existing = loadSaved().find((f) => f.key === source.registryKey);
+      const named = source.canonicalSearch !== source.registryKey;
+      upsertSaved(named || !existing
+        ? { key: source.registryKey, name: source.displayName, search: source.canonicalSearch }
+        : { key: existing.key, name: existing.name, search: existing.search });
     }
   }, [data.status, source]);
 

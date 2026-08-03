@@ -29,7 +29,7 @@ test('E2E-19: header-only sheet → friendly empty state (UC-22)', async ({ page
 // (HTML error page, wrong columns). useFamilyData() catches that as a 'failed' status (reason:
 // 'unreadable') and the app shows the ErrorPanel ("This tree couldn't be loaded"), NOT the
 // old demo-fallback banner (removed) and NOT the empty-state — that's header-only.csv, above.
-test('E2E-19b: zero-byte sheet is unreadable (no header row) — falls back to sample data', async ({ page }) => {
+test('E2E-19b: unreadable sheet shows the could-not-load panel (UC-23)', async ({ page }) => {
   await serveCsv(page, { fixtureName: 'empty.csv' });
   await gotoSrc(page);
   await expect(page.getByTestId('error-panel')).toContainText(/readable sheet/i);

@@ -60,6 +60,42 @@ describe('App', () => {
     });
   });
 
+  it('re-opening a saved source with no ?name= keeps the existing name/search, only refreshing savedAt', async () => {
+    const key = `?${new URLSearchParams({ src: SRC_URL })}`;
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify([
+      { key, name: 'Alpha Family', search: SRC_SEARCH, savedAt: 1000 },
+    ]));
+    setUrl(`?${new URLSearchParams({ src: SRC_URL })}`); // no &name=
+    okFetch();
+    render(<App />);
+    // The page itself shows the fallback title (no ?name= was given) — only the
+    // registry entry is expected to retain the previously-saved name.
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Family Tree' })).toBeInTheDocument());
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(REGISTRY_STORAGE_KEY)!) as Array<{ key: string; name: string; search: string; savedAt: number }>;
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toMatchObject({ key, name: 'Alpha Family', search: SRC_SEARCH });
+      expect(saved[0].savedAt).toBeGreaterThan(1000);
+    });
+  });
+
+  it('re-opening a saved source WITH ?name= renames the entry', async () => {
+    const key = `?${new URLSearchParams({ src: SRC_URL })}`;
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify([
+      { key, name: 'Alpha Family', search: SRC_SEARCH, savedAt: 1000 },
+    ]));
+    const newSearch = `?${new URLSearchParams({ src: SRC_URL, name: 'New Name' })}`;
+    setUrl(newSearch);
+    okFetch();
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'New Name' })).toBeInTheDocument());
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(REGISTRY_STORAGE_KEY)!) as Array<{ key: string; name: string; search: string }>;
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toMatchObject({ key, name: 'New Name', search: newSearch });
+    });
+  });
+
   it('unknown ?family → link-error panel with demo link, nothing saved', () => {
     setUrl('?family=nope');
     okFetch();
