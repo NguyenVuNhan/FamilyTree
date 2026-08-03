@@ -50,4 +50,15 @@ describe('Toolbar', () => {
       expect(btn.textContent).toBe('');
     }
   });
+
+  it('renders the share button only when shareLink is provided', () => {
+    const base = {
+      title: 'T', scalePct: 100, onZoomIn: () => {}, onZoomOut: () => {}, onFit: () => {},
+      onPrint: () => {}, settingsOpen: false, onToggleSettings: () => {},
+    };
+    const { rerender } = render(<Toolbar {...base} />);
+    expect(screen.queryByRole('button', { name: 'Copy share link' })).not.toBeInTheDocument();
+    rerender(<Toolbar {...base} shareLink="https://host.example/?family=demo" />);
+    expect(screen.getByRole('button', { name: 'Copy share link' })).toBeInTheDocument();
+  });
 });

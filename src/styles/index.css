@@ -171,3 +171,11 @@ body { background: #f6f7f9; color: #1a202c; }
 .saved-families li > button:last-child { border: none; background: none; cursor: pointer; font-size: 16px; color: #718096; }
 .demo-hint { text-align: center; }
 .demo-hint a { color: #4a5568; text-decoration: underline; }
+
+/* Share-link button in the toolbar */
+.share-link { display: inline-flex; align-items: center; gap: 6px; }
+.share-link [data-testid='copy-confirmation'] { font-size: 12px; color: #4a5568; }
+.share-link input {
+  width: 240px; border: 1px solid #d5dae2; border-radius: 6px;
+  padding: 4px 8px; font-size: 12px;
+}
