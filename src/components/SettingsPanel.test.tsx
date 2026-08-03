@@ -54,3 +54,32 @@ describe('SettingsPanel', () => {
     expect(onChange).toHaveBeenCalledWith(DEFAULT_SETTINGS);
   });
 });
+
+describe('print controls gating (UC-78)', () => {
+  const flow = { ...DEFAULT_SETTINGS, arrangement: 'flow' as const };
+  it('flow: card controls disabled with tooltip, print controls present', () => {
+    render(<SettingsPanel settings={flow} onChange={() => {}} />);
+    expect(screen.getByRole('group', { name: 'Card style' }).querySelector('button')).toBeDisabled();
+    expect(screen.getByRole('group', { name: 'Theme' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Format' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Frame guide')).toBeInTheDocument();
+  });
+  it('topDown: print controls absent, card controls enabled', () => {
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onChange={() => {}} />);
+    expect(screen.queryByRole('group', { name: 'Theme' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Card style' }).querySelector('button')).toBeEnabled();
+  });
+  it('custom format: inputs clamp and report invalid', async () => {
+    const onChange = vi.fn();
+    render(<SettingsPanel settings={{ ...flow, format: 'custom' }} onChange={onChange} />);
+    const w = screen.getByLabelText('Custom width (mm)');
+    await userEvent.clear(w);
+    await userEvent.type(w, '299');
+    expect(screen.getByTestId('custom-size-error')).toHaveTextContent('300');
+    expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ customWmm: 299 }));
+  });
+  it('square shows the soft aspect hint for flow', () => {
+    render(<SettingsPanel settings={{ ...flow, format: 'square' }} onChange={() => {}} />);
+    expect(screen.getByTestId('aspect-hint')).toBeInTheDocument();
+  });
+});
