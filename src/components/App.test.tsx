@@ -226,3 +226,29 @@ describe('App', () => {
     expect(document.querySelector('.person-card.style-archCard')).not.toBeNull();
   });
 });
+
+describe('flow arrangement (UC-77/82/89)', () => {
+  const csvFetch = (csv: string) => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => csv }) as Response));
+
+  it('renders PrintTreeCanvas for ?view=arr:flow and sets body dataset', async () => {
+    csvFetch('Image,Gen 1,Gen 2\n,Ông Nội (1900–1980) + Bà Nội,\n,,Con Trai');
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:flow')}`);
+    render(<App />);
+    expect(await screen.findByTestId('print-expanded', {}, { timeout: 50 }).catch(() => null)).toBeNull();
+    expect((await screen.findAllByRole('button', { name: /Ông/ })).length).toBeGreaterThan(0);
+    expect(document.body.dataset.printArrangement).toBe('flow');
+    expect(document.querySelector('svg.print-canvas-svg')).toBeTruthy();
+  });
+
+  it('fit refusal strip appears when content exceeds format (a4 + long tree)', async () => {
+    const wideFixtureCsv = [
+      'Image,Gen 1,Gen 2',
+      ',Ông Tổ Đường Rất Là Dài + Bà Tổ Đường Rất Là Dài,',
+      ...Array.from({ length: 12 }, (_, i) => `,,Người Con Thứ ${i + 1} Có Tên Rất Là Dài Để Vượt Khổ A4`),
+    ].join('\n');
+    csvFetch(wideFixtureCsv);
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:flow,fmt:a4')}`);
+    render(<App />);
+    expect(await screen.findByTestId('fit-refusal')).toHaveTextContent('cm');
+  });
+});

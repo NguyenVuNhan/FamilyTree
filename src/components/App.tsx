@@ -4,12 +4,20 @@ import { loadSaved, upsertSaved } from '../config/registry';
 import { resolveSource, type ResolvedSource } from '../config/source';
 import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
+import { flowLayout, printUnplacedIds, type PrintMeasurer } from '../layout/flow-layout';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
+import { canvasMeasurer } from '../layout/name-metrics';
+import { buildExportSvg, collectFontCss, downloadSvg, exportFilename } from '../print/export';
+import { TITLE_BLOCK_MM, checkFit } from '../print/fit';
+import { formatSizeMm } from '../print/formats';
+import { THEMES, type ThemeId } from '../print/themes';
 import { loadSettings, saveSettings, type LayoutSettings } from '../settings/settings';
 import { decodeView, encodeView } from '../settings/view-param';
 import { ErrorPanel } from './ErrorPanel';
 import { LoadFamilyDialog } from './LoadFamilyDialog';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
+import { PrintSheet } from './PrintSheet';
+import { PrintTreeCanvas } from './PrintTreeCanvas';
 import { SampleDataBanner } from './SampleDataBanner';
 import { SettingsPanel } from './SettingsPanel';
 import { Toolbar } from './Toolbar';
@@ -18,6 +26,24 @@ import { useFamilyData } from './use-family-data';
 import { useNameLines } from './use-name-lines';
 
 const LINK_ERROR_HINT = 'Check the link you were given, or ask the person who shared it for a new one.';
+
+/** Flow-scene text metrics: measures immediately (fallback font), then once more
+ *  once the theme's real font is loaded — same re-measure pattern as useNameLines,
+ *  just keyed on the theme's title/name font families instead of the fixed card font. */
+function usePrintMeasure(theme: ThemeId): PrintMeasurer {
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    document.fonts?.ready.then(() => { if (alive) setFontsReady(true); });
+    return () => { alive = false; };
+  }, []);
+  return useMemo(() => {
+    void fontsReady;
+    const { titleFamily, nameFamily } = THEMES[theme];
+    return (text: string, fontMm: number, titleFace: boolean) =>
+      canvasMeasurer(`${titleFace ? 600 : 500} ${fontMm}px ${titleFace ? titleFamily : nameFamily}`)(text);
+  }, [theme, fontsReady]);
+}
 
 const FAILED_MESSAGES = {
   'load-failed': "This link's sheet couldn't be loaded — it may be unpublished, offline, or blocked.",
@@ -106,6 +132,12 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     [data, settings, nameLines],
   );
 
+  const printMeasure = usePrintMeasure(settings.theme);
+  const scene = useMemo(
+    () => (data.status === 'ready' ? flowLayout(data.model, printMeasure) : null),
+    [data, printMeasure],
+  );
+
   // Never a silently wrong tree (spec §6): if the single-root layout walk couldn't
   // reach everyone in the model (e.g. a rendered child's spouse's own parents form a
   // second root-candidate union), surface it rather than dropping them without a trace.
@@ -118,7 +150,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
   }, [data, layout]);
 
   useEffect(() => {
-    if (!layout) return;
+    if (!layout || settings.arrangement !== 'topDown') return;
     const onBeforePrint = () => {
       document.documentElement.style.setProperty(
         '--print-scale', String(Math.min(1, 1000 / layout.width, 660 / layout.height)),
@@ -126,7 +158,14 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     };
     window.addEventListener('beforeprint', onBeforePrint);
     return () => window.removeEventListener('beforeprint', onBeforePrint);
-  }, [layout]);
+  }, [layout, settings.arrangement]);
+
+  // CSS (index.css) keys the print-only sheet visibility off body[data-print-arrangement].
+  useEffect(() => {
+    if (settings.arrangement !== 'flow') return;
+    document.body.dataset.printArrangement = 'flow';
+    return () => { delete document.body.dataset.printArrangement; };
+  }, [settings.arrangement]);
 
   if (data.status === 'loading') return <main className="center-screen" data-testid="loading"><div className="spinner" aria-label="Loading" /></main>;
   if (data.status === 'invalid') return <main className="center-screen"><ErrorPanel errors={data.errors} /></main>;
@@ -140,6 +179,31 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     );
   }
 
+  const isFlow = settings.arrangement === 'flow';
+  const theme = THEMES[settings.theme];
+  const size = formatSizeMm(settings);
+  const fit = scene ? checkFit(scene.wMm, scene.hMm + TITLE_BLOCK_MM, size, settings.marginMm) : { ok: true as const };
+  // Blocked-export precedence (UC-82/89): unplaced people first (display names,
+  // never the synthetic r5/r5p ids), then fit refusal, else export is enabled.
+  const unplacedNames = scene
+    ? printUnplacedIds(data.model, scene).map((id) => data.model.persons.get(id)!.fullName)
+    : [];
+  const exportDisabledReason: string | null = unplacedNames.length > 0
+    ? `Cannot export while people are missing from the tree: ${unplacedNames.join(', ')}`
+    : !fit.ok ? fit.message : null;
+  const guide = settings.frameGuide ? { wMm: size.wMm, hMm: size.hMm, marginMm: settings.marginMm } : null;
+  const handleExport = () => {
+    collectFontCss(theme).then((fontCss) =>
+      downloadSvg(
+        buildExportSvg(document.querySelector('.print-canvas-svg')!, {
+          wMm: size.wMm, hMm: size.hMm, marginMm: settings.marginMm, fontCss, background: theme.background,
+        }),
+        exportFilename(source.displayName, 'flow', settings.theme, size.wMm, size.hMm),
+      ),
+    );
+  };
+  const toggleExpanded = (id: string) => setExpandedId((cur) => (cur === id ? null : id));
+
   return (
     <div className="app">
       <Toolbar
@@ -152,6 +216,8 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         onPrint={() => window.print()}
         settingsOpen={panelOpen}
         onToggleSettings={() => setPanelOpen((o) => !o)}
+        onExport={isFlow ? handleExport : undefined}
+        exportDisabledReason={isFlow ? exportDisabledReason : undefined}
       />
       {panelOpen && <SettingsPanel settings={settings} onChange={changeSettings} />}
       {source.kind === 'demo' && !bannerDismissed && (
@@ -162,15 +228,34 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
           {warnings.map((w, i) => <p key={i}>{w.message}</p>)}
         </div>
       )}
+      {isFlow && !fit.ok && (
+        // Blocks export/print (see exportDisabledReason above) — the canvas itself keeps
+        // rendering regardless, per spec: a fit failure never hides the tree.
+        <div className="warnings" data-testid="fit-refusal">{fit.message}</div>
+      )}
       <PanZoomViewport
-        contentSize={{ width: layout!.width, height: layout!.height }}
+        contentSize={isFlow && scene
+          ? { width: scene.wMm, height: scene.hMm + TITLE_BLOCK_MM }
+          : { width: layout!.width, height: layout!.height }}
         onBackgroundClick={() => { setExpandedId(null); setPanelOpen(false); }}
         viewportRef={viewport}
         onScaleChange={setScalePct}
       >
-        <TreeCanvas model={data.model} layout={layout!} settings={settings} nameLines={nameLines}
-          expandedId={expandedId} onToggle={(id) => setExpandedId((cur) => (cur === id ? null : id))} />
+        {isFlow && scene ? (
+          <PrintTreeCanvas scene={scene} theme={theme} title={source.displayName}
+            guide={guide} expandedId={expandedId} onToggle={toggleExpanded} />
+        ) : (
+          <TreeCanvas model={data.model} layout={layout!} settings={settings} nameLines={nameLines}
+            expandedId={expandedId} onToggle={toggleExpanded} />
+        )}
       </PanZoomViewport>
+      {isFlow && (
+        // The @page rule this injects (id="print-page") beats index.css's unscoped
+        // @page{size:landscape} purely by head insertion order — same specificity,
+        // later wins — so PrintSheet must stay mounted after main.tsx's stylesheet import.
+        <PrintSheet svgSelector=".print-canvas-svg" wMm={size.wMm} hMm={size.hMm}
+          marginMm={settings.marginMm} background={theme.background} />
+      )}
     </div>
   );
 }
