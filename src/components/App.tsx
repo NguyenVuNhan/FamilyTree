@@ -4,13 +4,12 @@ import { loadSaved, upsertSaved } from '../config/registry';
 import { resolveSource, type ResolvedSource } from '../config/source';
 import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
-import { flowLayout, printUnplacedIds, type PrintMeasurer } from '../layout/flow-layout';
+import { flowLayout, printUnplacedIds } from '../layout/flow-layout';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
-import { canvasMeasurer } from '../layout/name-metrics';
 import { buildExportSvg, collectFontCss, downloadSvg, exportFilename } from '../print/export';
 import { TITLE_BLOCK_MM, checkFit } from '../print/fit';
 import { formatSizeMm } from '../print/formats';
-import { THEMES, type ThemeId } from '../print/themes';
+import { THEMES } from '../print/themes';
 import { loadSettings, saveSettings, type LayoutSettings } from '../settings/settings';
 import { decodeView, encodeView } from '../settings/view-param';
 import { ErrorPanel } from './ErrorPanel';
@@ -24,26 +23,9 @@ import { Toolbar } from './Toolbar';
 import { TreeCanvas } from './TreeCanvas';
 import { useFamilyData } from './use-family-data';
 import { useNameLines } from './use-name-lines';
+import { usePrintMeasure } from './use-print-measure';
 
 const LINK_ERROR_HINT = 'Check the link you were given, or ask the person who shared it for a new one.';
-
-/** Flow-scene text metrics: measures immediately (fallback font), then once more
- *  once the theme's real font is loaded — same re-measure pattern as useNameLines,
- *  just keyed on the theme's title/name font families instead of the fixed card font. */
-function usePrintMeasure(theme: ThemeId): PrintMeasurer {
-  const [fontsReady, setFontsReady] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    document.fonts?.ready.then(() => { if (alive) setFontsReady(true); });
-    return () => { alive = false; };
-  }, []);
-  return useMemo(() => {
-    void fontsReady;
-    const { titleFamily, nameFamily } = THEMES[theme];
-    return (text: string, fontMm: number, titleFace: boolean) =>
-      canvasMeasurer(`${titleFace ? 600 : 500} ${fontMm}px ${titleFace ? titleFamily : nameFamily}`)(text);
-  }, [theme, fontsReady]);
-}
 
 const FAILED_MESSAGES = {
   'load-failed': "This link's sheet couldn't be loaded — it may be unpublished, offline, or blocked.",
@@ -74,6 +56,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [scalePct, setScalePct] = useState(100);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const viewport = useRef<ViewportApi | null>(null);
 
   const changeSettings = (s: LayoutSettings) => {
@@ -193,6 +176,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     : !fit.ok ? fit.message : null;
   const guide = settings.frameGuide ? { wMm: size.wMm, hMm: size.hMm, marginMm: settings.marginMm } : null;
   const handleExport = () => {
+    setExportError(null);
     collectFontCss(theme).then((fontCss) =>
       downloadSvg(
         buildExportSvg(document.querySelector('.print-canvas-svg')!, {
@@ -200,7 +184,12 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         }),
         exportFilename(source.displayName, 'flow', settings.theme, size.wMm, size.hMm),
       ),
-    );
+    ).catch((err: unknown) => {
+      // Offline / a 404'd font asset must never be a silent no-op click or an
+      // unhandled rejection — surface it the same way fit/unplaced refusals are shown.
+      console.error('Export failed', err);
+      setExportError('Export failed — check your connection and retry.');
+    });
   };
   const toggleExpanded = (id: string) => setExpandedId((cur) => (cur === id ? null : id));
 
@@ -232,6 +221,9 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         // Blocks export/print (see exportDisabledReason above) — the canvas itself keeps
         // rendering regardless, per spec: a fit failure never hides the tree.
         <div className="warnings" data-testid="fit-refusal">{fit.message}</div>
+      )}
+      {isFlow && exportError && (
+        <div className="warnings" data-testid="export-error">{exportError}</div>
       )}
       <PanZoomViewport
         contentSize={isFlow && scene

@@ -95,7 +95,10 @@ export function PanZoomViewport({ contentSize, children, onBackgroundClick, view
         // the capturing element — a plain click on a card would never reach the
         // card's own onClick. We only engage capture once we know it's a real
         // drag (see onPointerMove), so a simple click dispatches natively.
-        const startedOnCard = (e.target as HTMLElement).closest('.person-card') !== null;
+        // .person-card is the topDown card; .person-node is the flow-arrangement's
+        // SVG <g> node (PrintTreeCanvas) — both need their own click to survive
+        // rather than being swallowed by the viewport's background-click handler.
+        const startedOnCard = (e.target as HTMLElement).closest('.person-card, .person-node') !== null;
         gesture.current = {
           startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY, dragged: false, startedOnCard,
           pointerId: e.pointerId,

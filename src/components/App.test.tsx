@@ -4,6 +4,15 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 import { REGISTRY_STORAGE_KEY } from '../config/registry';
+import { collectFontCss } from '../print/export';
+
+// Only collectFontCss is overridden (wrapped in a spy that still calls through by
+// default) — this lets one test (Finding 3: export failure path) force a rejection
+// via mockRejectedValueOnce without touching buildExportSvg/downloadSvg/exportFilename.
+vi.mock('../print/export', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../print/export')>();
+  return { ...actual, collectFontCss: vi.fn(actual.collectFontCss) };
+});
 
 const DEMO_CSV = 'Đời 1,Đời 2,Image\nMa Ellis + Pa Ellis,,\n,Kid Ellis,';
 const SRC_URL = 'https://sheets.example/a.csv';
@@ -250,5 +259,18 @@ describe('flow arrangement (UC-77/82/89)', () => {
     setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:flow,fmt:a4')}`);
     render(<App />);
     expect(await screen.findByTestId('fit-refusal')).toHaveTextContent('cm');
+  });
+
+  it('export failure surfaces a message instead of a silent no-op / unhandled rejection', async () => {
+    vi.mocked(collectFontCss).mockRejectedValueOnce(new Error('offline'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    csvFetch('Image,Gen 1,Gen 2\n,Ông Nội + Bà Nội,\n,,Con Trai');
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:flow')}`);
+    render(<App />);
+    await screen.findAllByRole('button', { name: /Ông/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Export SVG' }));
+    expect(await screen.findByTestId('export-error')).toHaveTextContent(/export failed/i);
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });
