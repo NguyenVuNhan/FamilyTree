@@ -82,4 +82,13 @@ describe('decorative avatar', () => {
     expect(el).not.toHaveAttribute('role');
     expect(el).not.toHaveAttribute('aria-label');
   });
+
+  it('decorative illustrated silhouette is aria-hidden, unlabeled, and still carries avatar-fallback', () => {
+    render(<Avatar person={nam} size={64} placeholderStyle="illustrated" decorative />);
+    const el = screen.getByTestId('silhouette');
+    expect(el).toHaveAttribute('aria-hidden', 'true');
+    expect(el).not.toHaveAttribute('role');
+    expect(el).not.toHaveAttribute('aria-label');
+    expect(el).toHaveClass('avatar-fallback');
+  });
 });

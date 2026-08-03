@@ -78,7 +78,7 @@ body { background: #f6f7f9; color: #1a202c; }
 
 /* circle: bare avatar, no card chrome; label floats on the canvas with a white halo for contrast */
 .person-card.style-circle { background: none; border: none; box-shadow: none; gap: 0; justify-content: flex-start; }
-.person-card.style-circle :is(img, [role='img']) { box-shadow: 0 0 0 3px var(--ring-color, #d4c4a8), 0 1px 4px rgb(16 24 40 / 0.15); }
+.person-card.style-circle :is(img, .avatar-fallback) { box-shadow: 0 0 0 3px var(--ring-color, #d4c4a8), 0 1px 4px rgb(16 24 40 / 0.15); }
 .person-card.style-circle .person-name {
   margin-top: var(--pad, 14px);
   text-shadow: 0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff, 0 0 6px #fff;
@@ -92,7 +92,7 @@ body { background: #f6f7f9; color: #1a202c; }
 
 /* photoLeft: compact horizontal card (Elvis-tree style) */
 .person-card.style-photoLeft { flex-direction: row; justify-content: flex-start; gap: 10px; border-radius: 12px; }
-.person-card.style-photoLeft :is(img, [role='img']) { border-radius: 8px; }
+.person-card.style-photoLeft :is(img, .avatar-fallback) { border-radius: 8px; }
 .person-card.style-photoLeft .person-name { text-align: left; }
 .person-card.style-photoLeft.expanded { flex-direction: column; }
 
