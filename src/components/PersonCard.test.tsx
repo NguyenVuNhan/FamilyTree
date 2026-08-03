@@ -23,17 +23,29 @@ describe('PersonCard content modes (classic)', () => {
 
   it('full mode collapsed: avatar AND name', () => {
     render(<PersonCard {...base} settings={s({ contentMode: 'full' })} expanded={false} />);
-    expect(screen.getByRole('img', { name: 'Ann Lee' })).toBeInTheDocument();
+    expect(document.querySelector('img, .avatar-fallback, [data-testid="silhouette"]')).not.toBeNull();
     expect(screen.getByText('Ann Lee')).toBeInTheDocument();
   });
 
   it('expanded shows BOTH regardless of content mode', () => {
     for (const contentMode of ['full', 'name', 'avatar'] as const) {
       const { unmount } = render(<PersonCard {...base} settings={s({ contentMode })} expanded={true} />);
-      expect(screen.getByRole('img', { name: 'Ann Lee' })).toBeInTheDocument();
+      expect(document.querySelector('img, .avatar-fallback, [data-testid="silhouette"]')).not.toBeNull();
       expect(screen.getByText('Ann Lee')).toBeInTheDocument();
       unmount();
     }
+  });
+
+  it('full mode: button accessible name is the bare full name (avatar decorative)', () => {
+    render(<PersonCard {...base} settings={s({ contentMode: 'full' })} expanded={false} />);
+    expect(screen.getByRole('button', { name: 'Ann Lee' })).toBeInTheDocument();
+    expect(screen.queryByRole('img')).toBeNull(); // decorative → out of the a11y tree
+    expect(document.querySelector('img, .avatar-fallback, [data-testid="silhouette"]')).not.toBeNull(); // still drawn
+  });
+
+  it('avatar mode: avatar keeps its accessible label (it IS the name)', () => {
+    render(<PersonCard {...base} settings={s({ contentMode: 'avatar' })} expanded={false} />);
+    expect(screen.getByRole('img', { name: 'Ann Lee' })).toBeInTheDocument();
   });
 });
 

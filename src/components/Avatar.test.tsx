@@ -67,3 +67,19 @@ describe('illustrated placeholders', () => {
     expect(screen.getByRole('img', { name: 'Ann' })).not.toHaveClass('rounded-full');
   });
 });
+
+describe('decorative avatar', () => {
+  it('decorative photo renders with empty alt', () => {
+    render(<Avatar person={{ id: 'x1', fullName: 'Ann Lee', imageSrc: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' }} size={64} decorative />);
+    const img = document.querySelector('img')!;
+    expect(img).toHaveAttribute('alt', '');
+  });
+
+  it('decorative fallback is aria-hidden and unlabeled', () => {
+    render(<Avatar person={{ id: 'x1', fullName: 'Ann Lee' }} size={64} decorative />);
+    const el = document.querySelector('.avatar-fallback')!;
+    expect(el).toHaveAttribute('aria-hidden', 'true');
+    expect(el).not.toHaveAttribute('role');
+    expect(el).not.toHaveAttribute('aria-label');
+  });
+});

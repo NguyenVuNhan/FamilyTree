@@ -45,6 +45,7 @@ export function PersonCard({ person, settings, expanded, x, y, onToggle }: {
           size={avatarSize}
           shape={style === 'archCard' && !expanded ? 'square' : 'circle'}
           placeholderStyle={settings.placeholderStyle}
+          decorative={showName}
         />
       )}
       {!nameOnTop && showName && name}

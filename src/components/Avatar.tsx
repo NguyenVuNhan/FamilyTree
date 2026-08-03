@@ -3,13 +3,14 @@ import type { Person } from '../data/types';
 import type { PlaceholderStyle } from '../settings/settings';
 import { avatarHue, initials } from './avatar-utils';
 
-function Silhouette({ gender, hue, size, shape, label }: {
-  gender: 'male' | 'female'; hue: number; size: number; shape: 'circle' | 'square'; label: string;
+function Silhouette({ gender, hue, size, shape, label, decorative }: {
+  gender: 'male' | 'female'; hue: number; size: number; shape: 'circle' | 'square'; label: string; decorative?: boolean;
 }) {
   return (
     <svg
-      role="img"
-      aria-label={label}
+      role={decorative ? undefined : 'img'}
+      aria-label={decorative ? undefined : label}
+      aria-hidden={decorative || undefined}
       data-testid="silhouette"
       data-gender={gender}
       width={size}
@@ -34,8 +35,8 @@ function Silhouette({ gender, hue, size, shape, label }: {
   );
 }
 
-export function Avatar({ person, size, shape = 'circle', placeholderStyle = 'initials' }: {
-  person: Person; size: number; shape?: 'circle' | 'square'; placeholderStyle?: PlaceholderStyle;
+export function Avatar({ person, size, shape = 'circle', placeholderStyle = 'initials', decorative = false }: {
+  person: Person; size: number; shape?: 'circle' | 'square'; placeholderStyle?: PlaceholderStyle; decorative?: boolean;
 }) {
   const [broken, setBroken] = useState(false);
   const [prevSrc, setPrevSrc] = useState(person.imageSrc);
@@ -48,7 +49,7 @@ export function Avatar({ person, size, shape = 'circle', placeholderStyle = 'ini
     return (
       <img
         src={person.imageSrc}
-        alt={person.fullName}
+        alt={decorative ? '' : person.fullName}
         onError={() => setBroken(true)}
         className={`${round} object-cover`.trim()}
         style={{ width: size, height: size, flexShrink: 0 }}
@@ -57,12 +58,13 @@ export function Avatar({ person, size, shape = 'circle', placeholderStyle = 'ini
   }
   const hue = avatarHue(person.id);
   if (placeholderStyle === 'illustrated' && person.gender) {
-    return <Silhouette gender={person.gender} hue={hue} size={size} shape={shape} label={person.fullName} />;
+    return <Silhouette gender={person.gender} hue={hue} size={size} shape={shape} label={person.fullName} decorative={decorative} />;
   }
   return (
     <div
-      role="img"
-      aria-label={person.fullName}
+      role={decorative ? undefined : 'img'}
+      aria-label={decorative ? undefined : person.fullName}
+      aria-hidden={decorative || undefined}
       className={`avatar-fallback flex items-center justify-center ${round} font-semibold text-white select-none`.trim()}
       style={{
         width: size,
