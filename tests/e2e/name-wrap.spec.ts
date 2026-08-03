@@ -23,6 +23,20 @@ async function expectNoClipping(page: Page) {
     expect(r.clipped).toBe(false);
     expect(r.nowrap).toBe(false);
   }
+  // The name span itself can be fully laid out (unclipped) while its ancestor
+  // .person-card — which has overflow: hidden — clips it. Assert at the card
+  // level too, the same atomic evaluateAll style as above.
+  const cardResults = await page.locator('.person-card').evaluateAll((els) =>
+    els.map((el) => ({
+      clippedH: el.scrollHeight > el.clientHeight + 1,
+      clippedW: el.scrollWidth > el.clientWidth + 1,
+    })),
+  );
+  expect(cardResults.length).toBeGreaterThan(0);
+  for (const r of cardResults) {
+    expect(r.clippedH).toBe(false);
+    expect(r.clippedW).toBe(false);
+  }
 }
 
 test('E2E-61: long names wrap fully visible with uniform card heights (UC-83, UC-85)', async ({ page }) => {

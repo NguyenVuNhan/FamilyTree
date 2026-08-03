@@ -20,6 +20,12 @@ const NAME_H = 20;   // one line of name text
 const RING = 4;      // circle-variant ring + breathing room
 const CLASSIC_SLACK = 28; // preserves today's 150 height at padding 14 (see test)
 
+/** archCard has zero layout slack (image bleeds, name padding exactly fills cardH) — its 1px
+ *  card border (top+bottom, or left+right) is real rendered pixels that cardH/cardW don't budget
+ *  for. PersonCard shrinks the bleeding avatar by this amount so content still fits inside the
+ *  border-box without touching the exported cardH/cardW (layout/print math stays unchanged). */
+export const ARCH_BORDER_INSET = 2;
+
 /** Matrix rule: a name-only rendering has no imagery to style — every style renders as classic. */
 export function effectiveCardStyle(s: LayoutSettings): CardStyle {
   return s.contentMode === 'name' ? 'classic' : s.cardStyle;

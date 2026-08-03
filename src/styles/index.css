@@ -43,6 +43,11 @@ body { background: #f6f7f9; color: #1a202c; }
   font-family: 'Be Vietnam Pro', Inter, system-ui, sans-serif;
   font-size: 13.5px; font-weight: 600; line-height: 20px; text-align: center; color: #1a202c;
   max-width: 100%; overflow-wrap: break-word;
+  /* A flex item's default automatic minimum size is its min-content width, which — per spec —
+     ignores overflow-wrap/break-word. Without this, .style-photoLeft's row layout refuses to
+     shrink an unbroken long word below its min-content, overflowing the card. min-width: 0 lets
+     max-width + overflow-wrap actually govern the wrap, in every card style (row or column). */
+  min-width: 0;
 }
 
 .toolbar {

@@ -1,20 +1,22 @@
 import type { CSSProperties } from 'react';
 import type { Person } from '../data/types';
 import type { LayoutSettings } from '../settings/settings';
-import { cardMetrics, effectiveCardStyle } from '../layout/card-metrics';
+import { ARCH_BORDER_INSET, cardMetrics, effectiveCardStyle } from '../layout/card-metrics';
 import { Avatar } from './Avatar';
 import { avatarHue } from './avatar-utils';
 
-export function PersonCard({ person, settings, expanded, x, y, onToggle }: {
+export function PersonCard({ person, settings, expanded, x, y, onToggle, nameLines }: {
   person: Person; settings: LayoutSettings; expanded: boolean;
-  x: number; y: number; onToggle: (id: string) => void;
+  x: number; y: number; onToggle: (id: string) => void; nameLines: number;
 }) {
   const style = effectiveCardStyle(settings);
-  const { cardW, cardH } = cardMetrics(settings);
+  const { cardW, cardH } = cardMetrics(settings, nameLines);
   const showAvatar = expanded || settings.contentMode !== 'name';
   const showName = expanded || settings.contentMode !== 'avatar';
   const nameOnTop = settings.namePosition === 'top' && style !== 'photoLeft' && !expanded;
-  const avatarSize = expanded ? 56 : style === 'photoLeft' ? 48 : style === 'archCard' ? cardW : 64;
+  // archCard's avatar bleeds to the card edge with zero slack (see ARCH_BORDER_INSET) — inset it
+  // by the card's own border width so the image + name stack fits inside without clipping.
+  const avatarSize = expanded ? 56 : style === 'photoLeft' ? 48 : style === 'archCard' ? cardW - ARCH_BORDER_INSET : 64;
   const bleeds = style === 'circle' || style === 'archCard'; // image/circle reaches the card edge
 
   const name = <span className="person-name" title={person.fullName}>{person.fullName}</span>;

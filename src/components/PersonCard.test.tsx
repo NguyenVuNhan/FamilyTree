@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS, type LayoutSettings } from '../settings/settings';
 
 const ann = { id: 'a', fullName: 'Ann Lee', imageSrc: 'https://x.test/a.jpg' };
 const s = (over: Partial<LayoutSettings> = {}): LayoutSettings => ({ ...DEFAULT_SETTINGS, ...over });
-const base = { person: ann, x: 0, y: 0, onToggle: () => {} };
+const base = { person: ann, x: 0, y: 0, onToggle: () => {}, nameLines: 1 };
 
 describe('PersonCard content modes (classic)', () => {
   it('avatar mode collapsed: avatar only, no visible name text', () => {

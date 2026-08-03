@@ -168,7 +168,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         viewportRef={viewport}
         onScaleChange={setScalePct}
       >
-        <TreeCanvas model={data.model} layout={layout!} settings={settings}
+        <TreeCanvas model={data.model} layout={layout!} settings={settings} nameLines={nameLines}
           expandedId={expandedId} onToggle={(id) => setExpandedId((cur) => (cur === id ? null : id))} />
       </PanZoomViewport>
     </div>
