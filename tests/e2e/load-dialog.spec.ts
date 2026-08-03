@@ -24,7 +24,9 @@ test('E2E-46: paste published URL + name → canonical ?sheet= URL, tree renders
   await page.getByTestId('name-input').fill('Alpha Family');
   await page.getByRole('button', { name: /view the tree/i }).click();
 
-  await expect(page).toHaveURL(`/?sheet=${E2E_SHEET_ID}&name=Alpha+Family`);
+  // Base-path-agnostic: under GITHUB_REPOSITORY (CI / Pages) the app serves at
+  // /<repo>/, and the dialog correctly preserves that path when navigating.
+  await expect(page).toHaveURL(new RegExp(`/\\?sheet=${E2E_SHEET_ID}&name=Alpha\\+Family$`));
   await expect(page.getByRole('heading', { name: 'Alpha Family' })).toBeVisible();
   await expect(page.locator('.person-card').first()).toBeVisible();
 });
