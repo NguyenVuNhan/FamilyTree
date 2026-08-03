@@ -140,6 +140,14 @@ body { background: #f6f7f9; color: #1a202c; }
   body { background: #fff; }
 }
 
+/* Print arrangements (flow/…): screen hides the sheet; print shows ONLY the sheet. */
+.print-sheet { display: none; }
+@media print {
+  body[data-print-arrangement] .app > *:not(.print-sheet) { display: none !important; }
+  body[data-print-arrangement] .print-sheet { display: block; }
+  body[data-print-arrangement] .print-sheet svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+
 /* Load dialog (no-params landing) */
 .load-dialog-backdrop {
   position: fixed; inset: 0; display: grid; place-items: center;
