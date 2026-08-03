@@ -43,7 +43,18 @@ test('SMK-03: print media hides chrome on the live site (UC-38, UC-4)', async ({
   await expect(page.locator('.tree-canvas')).toBeVisible();
 });
 
-test('SMK-04: unknown family shows not-found on real hosting (UC-36, SPA base-path sanity)', async ({ page }) => {
+test('SMK-04: unknown family shows the link-error panel on real hosting (UC-50, SPA base-path sanity)', async ({ page }) => {
   await page.goto('./?family=nonexistent');
-  await expect(page.getByTestId('family-not-found')).toBeVisible();
+  await expect(page.getByTestId('error-panel')).toContainText('no family tree at this address');
+  await expect(page.getByRole('link', { name: /demo family/i })).toBeVisible();
+});
+
+test('SMK-05: bare URL opens the load dialog; demo link stays under the base path (UC-54, UC-72)', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.getByTestId('load-dialog')).toBeVisible();
+  const href = (await page.getByRole('link', { name: /demo family/i }).getAttribute('href'))!;
+  // Relative ?family=demo must resolve to the same deployed path (e.g. /<repo>/), not the domain root.
+  const resolved = new URL(href, page.url());
+  expect(resolved.pathname).toBe(new URL(page.url()).pathname);
+  expect(resolved.search).toBe('?family=demo');
 });
