@@ -6,6 +6,7 @@ import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
 import { loadSettings, saveSettings, type LayoutSettings } from '../settings/settings';
+import { decodeView, encodeView } from '../settings/view-param';
 import { ErrorPanel } from './ErrorPanel';
 import { LoadFamilyDialog } from './LoadFamilyDialog';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
@@ -25,6 +26,7 @@ const FAILED_MESSAGES = {
 
 export default function App() {
   const resolution = resolveSource(window.location.search, import.meta.env.BASE_URL);
+  const viewRaw = new URLSearchParams(window.location.search).get('view');
   if (resolution.status === 'none') {
     return <LoadFamilyDialog saved={loadSaved()} navigate={(search) => window.location.assign(search)} />;
   }
@@ -36,12 +38,12 @@ export default function App() {
       </main>
     );
   }
-  return <FamilyApp source={resolution.source} />;
+  return <FamilyApp source={resolution.source} linkSettings={viewRaw !== null ? decodeView(viewRaw) : null} />;
 }
 
-function FamilyApp({ source }: { source: ResolvedSource }) {
+function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSettings: LayoutSettings | null }) {
   const data = useFamilyData(source.csvUrl);
-  const [settings, setSettings] = useState(() => loadSettings(source.settingsKey));
+  const [settings, setSettings] = useState(() => linkSettings ?? loadSettings(source.settingsKey));
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [scalePct, setScalePct] = useState(100);
@@ -53,7 +55,19 @@ function FamilyApp({ source }: { source: ResolvedSource }) {
     saveSettings(source.settingsKey, s);
   };
 
-  const shareLink = `${window.location.origin}${window.location.pathname}${source.canonicalSearch}`;
+  // Link wins: a shared view is applied exactly (including sender-default fields),
+  // persisted, then ?view= is stripped so reload after a tweak doesn't snap back.
+  useEffect(() => {
+    if (linkSettings) {
+      saveSettings(source.settingsKey, linkSettings);
+      window.history.replaceState(null, '', window.location.pathname + source.canonicalSearch);
+    }
+  }, [linkSettings, source]);
+
+  const viewValue = encodeView(settings);
+  const shareLink = `${window.location.origin}${window.location.pathname}${source.canonicalSearch}${
+    viewValue !== null ? `&view=${encodeURIComponent(viewValue)}` : ''
+  }`;
 
   useEffect(() => { document.title = `${source.displayName} — Family Tree`; }, [source.displayName]);
 

@@ -9,6 +9,8 @@ const DEMO_CSV = 'Đời 1,Đời 2,Image\nMa Ellis + Pa Ellis,,\n,Kid Ellis,';
 const SRC_URL = 'https://sheets.example/a.csv';
 const SRC_SEARCH = `?${new URLSearchParams({ src: SRC_URL, name: 'Alpha Family' })}`;
 
+const LAYOUT_KEY = `ft:layout:src:${SRC_URL}`;
+
 const okFetch = () => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => DEMO_CSV }) as Response));
 const setUrl = (search: string) => window.history.replaceState({}, '', `/${search}`);
 afterEach(() => { vi.unstubAllGlobals(); setUrl(''); localStorage.clear(); });
@@ -182,5 +184,45 @@ describe('App', () => {
     okFetch();
     render(<App />);
     await waitFor(() => screen.getByText('Ma Ellis')); // name mode renders names
+  });
+
+  it('share link gains &view= only when settings differ from the defaults', async () => {
+    setUrl(SRC_SEARCH);
+    okFetch();
+    render(<App />);
+    await waitFor(() => screen.getByRole('heading', { name: 'Alpha Family' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy share link' }));
+    const box = await screen.findByRole('textbox', { name: 'Share link' });
+    expect(box).toHaveValue(`${window.location.origin}${window.location.pathname}${SRC_SEARCH}`); // no &view=
+
+    await userEvent.click(screen.getByRole('button', { name: 'Layout settings' }));
+    await userEvent.click(within(screen.getByTestId('settings-panel')).getByRole('button', { name: 'Circle' }));
+    expect(screen.getByRole('textbox', { name: 'Share link' }))
+      .toHaveValue(`${window.location.origin}${window.location.pathname}${SRC_SEARCH}&view=${encodeURIComponent('style:circle')}`);
+  });
+
+  it('a ?view= link wins over saved settings, persists, and strips the param', async () => {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify({ cardStyle: 'photoLeft' }));
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('style:circle')}`);
+    okFetch();
+    render(<App />);
+    await waitFor(() => screen.getByRole('heading', { name: 'Alpha Family' }));
+
+    expect(document.querySelector('.person-card.style-circle')).not.toBeNull();
+    expect(document.querySelector('.person-card.style-photoLeft')).toBeNull();
+    await waitFor(() => {
+      expect(JSON.parse(localStorage.getItem(LAYOUT_KEY)!)).toMatchObject({ cardStyle: 'circle', contentMode: 'full' });
+      expect(window.location.search).not.toContain('view=');
+    });
+    expect(window.location.search).toContain('src=');
+  });
+
+  it('a malformed view degrades silently to defaults — no error panel', async () => {
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('style:bogus,,junk')}`);
+    okFetch();
+    render(<App />);
+    await waitFor(() => screen.getByRole('heading', { name: 'Alpha Family' }));
+    expect(document.querySelector('.person-card.style-archCard')).not.toBeNull();
   });
 });
