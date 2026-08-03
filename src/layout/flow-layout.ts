@@ -161,6 +161,9 @@ export function flowLayout(model: FamilyModel, measure: PrintMeasurer): PrintSce
           Math.max(...[n.children[i], n.children[i + rows]].filter(Boolean).map((c) => heights.get(c!)!)),
         ).reduce((s, v) => s + v, 0) + SIBLING_GAP_MM * (rows - 1);
       let rowTop = top + (slot - kidsH) / 2;
+      // Gutter strictly between the two mini-columns (past col 1's right edge, before
+      // col 2's left edge) — genuinely empty space regardless of row, safe to route through.
+      const runGapX = colX[gen + 1] + runW + SIBLING_GAP_MM / 2;
       for (let i = 0; i < rows; i++) {
         const rowH = Math.max(...[n.children[i], n.children[i + rows]].filter(Boolean).map((c) => heights.get(c!)!));
         for (const [j, child] of [n.children[i], n.children[i + rows]].entries()) {
@@ -168,12 +171,25 @@ export function flowLayout(model: FamilyModel, measure: PrintMeasurer): PrintSce
           const cx = colX[gen + 1] + j * (runW + SIBLING_GAP_MM);
           const id = (child as { personId: string }).personId;
           const c = caps.get(id)!;
+          const ty = rowTop + rowH / 2;
           nodes.push({ personId: id, xMm: cx, yMm: rowTop + (rowH - c.hMm) / 2, generation: gen + 1, ...c });
-          edges.push({
-            fromId: n.union.id,
-            toId: id,
-            d: `M ${anchor.x} ${anchor.y} C ${busX} ${anchor.y} ${busX} ${rowTop + rowH / 2} ${cx} ${rowTop + rowH / 2}`,
-          });
+          // The first mini-column's connector approaches directly at row height — safe,
+          // since it terminates right at col 1's left edge. The second mini-column's
+          // connector would otherwise sweep straight through col 1's capsule at this same
+          // row height (spec: no connector may cross a capsule); instead it climbs to
+          // `top` (at or above every row, x still left of col 1) while it's still safely
+          // left of col 1, crosses col 1 at that safe height through the empty band above
+          // all rows, then drops into the target only once inside the col1↔col2 gutter.
+          const d =
+            j === 0
+              ? `M ${anchor.x} ${anchor.y} C ${busX} ${anchor.y} ${busX} ${ty} ${cx} ${ty}`
+              : [
+                  `M ${anchor.x} ${anchor.y}`,
+                  `C ${anchor.x} ${top} ${busX} ${top} ${busX} ${top}`,
+                  `C ${busX} ${top} ${runGapX} ${top} ${runGapX} ${top}`,
+                  `C ${runGapX} ${top} ${cx} ${top} ${cx} ${ty}`,
+                ].join(' ');
+          edges.push({ fromId: n.union.id, toId: id, d });
         }
         rowTop += rowH + SIBLING_GAP_MM;
       }
