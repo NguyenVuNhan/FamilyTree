@@ -58,3 +58,9 @@ test('SMK-05: bare URL opens the load dialog; demo link stays under the base pat
   expect(resolved.pathname).toBe(new URL(page.url()).pathname);
   expect(resolved.search).toBe('?family=demo');
 });
+
+test('SMK-06: live demo defaults to arch cards with names', async ({ page }) => {
+  await page.goto('./?family=demo');
+  await expect(page.locator('.person-card.style-archCard').first()).toBeVisible();
+  await expect(page.locator('.person-name').first()).toBeVisible();
+});
