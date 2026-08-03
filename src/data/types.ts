@@ -6,6 +6,9 @@ export interface PersonRow {
   gender: string;           // raw cell text (Gender / PartnerGender column), '' when blank
   partnerId: string;        // r<rowNumber>p when the cell names a partner, '' otherwise
   parentIds: string[];      // ids of the parent row's person (and partner, if any)
+  cleanName?: string;       // fullName minus a trailing "(years)"; absent ⇒ same as fullName
+  birthYear?: number;       // from trailing "(1932…)" — print arrangements only; topDown shows fullName verbatim
+  deathYear?: number;
 }
 
 export interface Person {
@@ -13,6 +16,9 @@ export interface Person {
   fullName: string;
   imageSrc?: string;
   gender?: 'male' | 'female';
+  cleanName?: string;
+  birthYear?: number;
+  deathYear?: number;
 }
 
 export interface Union {

@@ -12,6 +12,9 @@ export function buildModel(rows: PersonRow[]): FamilyModel {
     persons.set(row.id, {
       id: row.id,
       fullName: row.fullName,
+      ...(row.cleanName !== undefined ? { cleanName: row.cleanName } : {}),
+      ...(row.birthYear !== undefined ? { birthYear: row.birthYear } : {}),
+      ...(row.deathYear !== undefined ? { deathYear: row.deathYear } : {}),
       ...(img.kind === 'src' ? { imageSrc: img.src } : {}),
       ...(gender ? { gender } : {}),
     });

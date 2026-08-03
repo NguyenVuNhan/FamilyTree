@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import type { Issue, PersonRow } from './types';
+import { extractYears } from './years';
 
 export class UnreadableSheetError extends Error {
   constructor() {
@@ -14,9 +15,19 @@ export interface ParseResult {
   warnings: Issue[];
 }
 
-// '+' or en-dash split a cell into "Name <sep> Partner". A plain hyphen is NOT a
-// separator — it may legitimately appear inside a name (e.g. "Mai-Anh").
-const SEPARATORS = ['+', '–'];
+// '+' or en-dash split a cell into "Name <sep> Partner" — but only OUTSIDE
+// parentheses, so "(1928–1996)" year ranges never split a couple. A plain
+// hyphen is NOT a separator — it may appear inside a name ("Mai-Anh").
+function findSeparator(cell: string): number {
+  let depth = 0;
+  for (let i = 0; i < cell.length; i++) {
+    const ch = cell[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (depth === 0 && (ch === '+' || ch === '–')) return i;
+  }
+  return -1;
+}
 
 interface GenColumn {
   index: number; // column position in the sheet
@@ -92,11 +103,7 @@ export function parseStaircase(text: string): ParseResult {
     }
 
     const cellText = at(filled[0].index);
-    let sepPos = -1;
-    for (const sep of SEPARATORS) {
-      const found = cellText.indexOf(sep);
-      if (found !== -1 && (sepPos === -1 || found < sepPos)) sepPos = found;
-    }
+    const sepPos = findSeparator(cellText);
     const fullName = (sepPos === -1 ? cellText : cellText.slice(0, sepPos)).trim();
     const partnerName = sepPos === -1 ? '' : cellText.slice(sepPos + 1).trim();
     if (!fullName) {
@@ -109,9 +116,22 @@ export function parseStaircase(text: string): ParseResult {
     const parent = depth === 0 ? undefined : stack[depth - 1];
     const parentIds = parent ? [parent.personId, parent.partnerId].filter(Boolean) : [];
 
-    rows.push({ rowNumber, id: personId, fullName, image, gender, partnerId, parentIds });
+    const personYears = extractYears(fullName);
+    rows.push({
+      rowNumber, id: personId, fullName, image, gender, partnerId, parentIds,
+      cleanName: personYears.cleanName,
+      ...(personYears.birthYear !== undefined ? { birthYear: personYears.birthYear } : {}),
+      ...(personYears.deathYear !== undefined ? { deathYear: personYears.deathYear } : {}),
+    });
     if (partnerId) {
-      rows.push({ rowNumber, id: partnerId, fullName: partnerName, image: partnerImage, gender: partnerGender, partnerId: '', parentIds: [] });
+      const partnerYears = extractYears(partnerName);
+      rows.push({
+        rowNumber, id: partnerId, fullName: partnerName, image: partnerImage,
+        gender: partnerGender, partnerId: '', parentIds: [],
+        cleanName: partnerYears.cleanName,
+        ...(partnerYears.birthYear !== undefined ? { birthYear: partnerYears.birthYear } : {}),
+        ...(partnerYears.deathYear !== undefined ? { deathYear: partnerYears.deathYear } : {}),
+      });
     } else if (partnerImage) {
       warnings.push({ row: rowNumber, message: `Row ${rowNumber} has a partner image but no partner — the image is ignored` });
     }
