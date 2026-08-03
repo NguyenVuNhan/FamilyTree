@@ -55,7 +55,7 @@ describe('load/save round-trip', () => {
 
   it('defaults match the spec', () => {
     expect(DEFAULT_SETTINGS).toEqual({
-      cardStyle: 'classic', contentMode: 'avatar', namePosition: 'bottom',
+      cardStyle: 'archCard', contentMode: 'full', namePosition: 'bottom',
       cardPadding: 14, coupleGap: 28, siblingGap: 36, genGap: 90,
       connectorStyle: 'elbow', placeholderStyle: 'initials',
     });

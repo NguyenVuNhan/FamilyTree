@@ -16,13 +16,13 @@ describe('effectiveCardStyle', () => {
 });
 
 describe('cardMetrics', () => {
-  it("default settings reproduce today's exact card size (132x150)", () => {
-    expect(cardMetrics(DEFAULT_SETTINGS)).toEqual({ cardW: 132, cardH: 150 });
+  it('default settings produce the arch-full card (132x180)', () => {
+    expect(cardMetrics(DEFAULT_SETTINGS)).toEqual({ cardW: 132, cardH: 180 });
   });
 
   it('padding grows the classic card symmetrically', () => {
-    const base = cardMetrics(s({ cardPadding: 14 }));
-    const bigger = cardMetrics(s({ cardPadding: 20 }));
+    const base = cardMetrics(s({ cardStyle: 'classic', cardPadding: 14 }));
+    const bigger = cardMetrics(s({ cardStyle: 'classic', cardPadding: 20 }));
     expect(bigger.cardW).toBe(base.cardW + 12);
     expect(bigger.cardH).toBe(base.cardH + 12);
   });
@@ -63,6 +63,6 @@ describe('layoutMetrics', () => {
   });
   it('DEFAULT_METRICS equals layoutMetrics(DEFAULT_SETTINGS)', () => {
     expect(DEFAULT_METRICS).toEqual(layoutMetrics(DEFAULT_SETTINGS));
-    expect(DEFAULT_METRICS).toMatchObject({ cardW: 132, cardH: 150, coupleGap: 28, siblingGap: 36, genGap: 90, margin: 40 });
+    expect(DEFAULT_METRICS).toMatchObject({ cardW: 132, cardH: 180, coupleGap: 28, siblingGap: 36, genGap: 90, margin: 40 });
   });
 });

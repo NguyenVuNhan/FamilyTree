@@ -26,8 +26,8 @@ export const SPACING_BOUNDS = {
 } as const;
 
 export const DEFAULT_SETTINGS: LayoutSettings = {
-  cardStyle: 'classic',
-  contentMode: 'avatar', // today's default view (avatar-only, photo-style)
+  cardStyle: 'archCard',
+  contentMode: 'full', // default view: arch photo card with the full name underneath
   namePosition: 'bottom',
   cardPadding: 14,
   coupleGap: COUPLE_GAP,
