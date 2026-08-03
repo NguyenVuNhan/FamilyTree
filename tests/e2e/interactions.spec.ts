@@ -52,13 +52,17 @@ test('E2E-04: fit-to-view recovers after panning away (UC-3)', async ({ page }) 
 });
 
 test('E2E-05: Show mode switches collapsed cards (UC-5)', async ({ page }) => {
-  // default avatar mode: avatar visible, name text hidden
-  await expect(card(page, 'r2p').getByText('Robert Ellis')).toHaveCount(0);
+  // default full mode: name visible
+  await expect(card(page, 'r2p').getByText('Robert Ellis')).toBeVisible();
+  await page.getByRole('button', { name: 'Layout settings' }).click();
+  await page.getByTestId('settings-panel').getByRole('button', { name: 'Avatar', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(card(page, 'r2p').getByText('Robert Ellis')).toHaveCount(0); // avatar-only hides the name
   await page.getByRole('button', { name: 'Layout settings' }).click();
   await page.getByTestId('settings-panel').getByRole('button', { name: 'Name', exact: true }).click();
-  await page.keyboard.press('Escape'); // close the panel so it doesn't cover cards
+  await page.keyboard.press('Escape');
   await expect(card(page, 'r2p').getByText('Robert Ellis')).toBeVisible();
-  await expect(card(page, 'r2p').getByRole('img')).toHaveCount(0);
+  await expect(card(page, 'r2p').locator('img, .avatar-fallback')).toHaveCount(0); // name-only hides the avatar
 });
 
 test('E2E-06: expand/collapse via every path; never two expanded (UC-6)', async ({ page }) => {
@@ -83,7 +87,7 @@ test('E2E-07: expanded card keeps both across mode toggle (UC-7, UC-8)', async (
   await panel.getByRole('button', { name: 'Name', exact: true }).click();
   await gear.click();
   await card(page, 'r2p').click();
-  await expect(card(page, 'r2p').getByRole('img')).toBeVisible();
+  await expect(card(page, 'r2p').locator('img, .avatar-fallback').first()).toBeVisible();
   await gear.click();
   await panel.getByRole('button', { name: 'Avatar', exact: true }).click();
   await gear.click();

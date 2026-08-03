@@ -16,7 +16,7 @@ test('E2E-32: settings change layout live and persist across reload', async ({ p
   await expect(page.locator('.person-card.style-circle').first()).toBeVisible();
   await panel.getByRole('slider', { name: 'Generation gap' }).fill('180');
   const after = await card(page, 'r2').boundingBox();
-  expect(after!.width).not.toBe(before!.width); // circle slot is narrower
+  expect(after!.height).toBeLessThan(before!.height); // circle-full (~106) is shorter than arch-full (~180)
 
   await page.reload();
   await expect(card(page, 'r2')).toBeVisible();
@@ -26,8 +26,8 @@ test('E2E-32: settings change layout live and persist across reload', async ({ p
 test('E2E-33: reset restores the default layout', async ({ page }) => {
   await page.getByRole('button', { name: 'Layout settings' }).click();
   const panel = page.getByTestId('settings-panel');
-  await panel.getByRole('button', { name: 'Arch' }).click();
+  await panel.getByRole('button', { name: 'Classic' }).click();
   await panel.getByRole('button', { name: 'Reset to defaults' }).click();
-  await expect(page.locator('.person-card.style-classic').first()).toBeVisible();
-  await expect(page.locator('.person-card.style-archCard')).toHaveCount(0);
+  await expect(page.locator('.person-card.style-archCard').first()).toBeVisible();
+  await expect(page.locator('.person-card.style-classic')).toHaveCount(0);
 });
