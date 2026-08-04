@@ -27,6 +27,9 @@ export interface PrintNode {
   years: string | null;
   fontMm: number;
   titleFace: boolean;
+  /** Clockwise degrees applied after the node's translate (fan's radial labels);
+   *  absent/0 for flow. Render transform: translate(xMm yMm) rotate(rotateDeg). */
+  rotateDeg?: number;
 }
 export interface PrintEdge {
   d: string;
@@ -41,26 +44,12 @@ export interface PrintScene {
 }
 export type PrintMeasurer = (text: string, fontMm: number, titleFace: boolean) => number;
 
-type TreeNode = { kind: 'union'; union: Union; children: TreeNode[] } | { kind: 'person'; personId: string };
+export type TreeNode = { kind: 'union'; union: Union; children: TreeNode[] } | { kind: 'person'; personId: string };
 
-/** Capsule box + text content for one person at a given generation. */
-function capsule(p: Person, gen: number, measure: PrintMeasurer) {
-  const fontMm = fontFor(gen);
-  const titleFace = gen <= 1;
-  const name = p.cleanName ?? p.fullName;
-  const nameLines = wrapName(name, WRAP_EM * fontMm, (t) => measure(t, fontMm, titleFace));
-  const years = formatYears(p.birthYear, p.deathYear);
-  const yMmFont = yearFontMm(fontMm);
-  const textW = Math.max(
-    ...nameLines.map((l) => measure(l, fontMm, titleFace)),
-    years ? measure(years, yMmFont, false) : 0,
-  );
-  const hMm = 2 * PAD_Y + nameLines.length * LINE_H * fontMm + (years ? LINE_H * yMmFont : 0);
-  return { wMm: 2 * PAD_X + textW, hMm, nameLines, years, fontMm, titleFace };
-}
-
-export function flowLayout(model: FamilyModel, measure: PrintMeasurer): PrintScene {
-  // — identical tree construction to layoutTree (transposed placement below) —
+/** Union-walk tree shared by the print engines (flow, fan): each union renders
+ *  once (first branch to reach it wins — cousin-marriage dedup, mirrors
+ *  layoutTree's contract); a 'p:'-prefixed root comes back as a bare person. */
+export function buildPrintTree(model: FamilyModel): TreeNode {
   const unionOfPartner = new Map<string, Union>();
   for (const u of model.unions) for (const p of u.partners) unionOfPartner.set(p, u);
   const visited = new Set<string>();
@@ -74,9 +63,31 @@ export function flowLayout(model: FamilyModel, measure: PrintMeasurer): PrintSce
     visited.add(u.id);
     return { kind: 'union', union: u, children: u.childIds.map(toNode).filter((n): n is TreeNode => n !== null) };
   };
-  const root: TreeNode = model.rootId.startsWith('p:')
+  return model.rootId.startsWith('p:')
     ? { kind: 'person', personId: model.rootId.slice(2) }
     : unionNode(model.unions.find((u) => u.id === model.rootId)!);
+}
+
+/** Capsule box + text content for one person at a given generation — shared by
+ *  the flow and fan engines so node metrics/wrapping are identical everywhere. */
+export function capsule(p: Person, gen: number, measure: PrintMeasurer) {
+  const fontMm = fontFor(gen);
+  const titleFace = gen <= 1;
+  const name = p.cleanName ?? p.fullName;
+  const nameLines = wrapName(name, WRAP_EM * fontMm, (t) => measure(t, fontMm, titleFace));
+  const years = formatYears(p.birthYear, p.deathYear);
+  const yMmFont = yearFontMm(fontMm);
+  const textW = Math.max(
+    ...nameLines.map((l) => measure(l, fontMm, titleFace)),
+    years ? measure(years, yMmFont, false) : 0,
+  );
+  const hMm = 2 * PAD_Y + nameLines.length * LINE_H * fontMm + (years ? LINE_H * yMmFont : 0);
+  return { wMm: 2 * PAD_X + textW, hMm, nameLines, years, fontMm, titleFace };
+}
+export type PrintCapsule = ReturnType<typeof capsule>;
+
+export function flowLayout(model: FamilyModel, measure: PrintMeasurer): PrintScene {
+  const root = buildPrintTree(model);
 
   // capsule cache + per-generation column widths
   const caps = new Map<string, ReturnType<typeof capsule>>();
