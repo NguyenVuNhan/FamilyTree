@@ -4,13 +4,14 @@ import { loadSaved, upsertSaved } from '../config/registry';
 import { resolveSource, type ResolvedSource } from '../config/source';
 import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
+import { fanLayout } from '../layout/fan-layout';
 import { flowLayout, printUnplacedIds } from '../layout/flow-layout';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
 import { buildExportSvg, collectFontCss, downloadSvg, exportFilename } from '../print/export';
 import { TITLE_BLOCK_MM, checkFit } from '../print/fit';
 import { formatSizeMm } from '../print/formats';
 import { THEMES } from '../print/themes';
-import { loadSettings, saveSettings, type LayoutSettings } from '../settings/settings';
+import { loadSettings, printControlsActive, saveSettings, type LayoutSettings } from '../settings/settings';
 import { decodeView, encodeView } from '../settings/view-param';
 import { ErrorPanel } from './ErrorPanel';
 import { LoadFamilyDialog } from './LoadFamilyDialog';
@@ -116,16 +117,14 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
   );
 
   const printMeasure = usePrintMeasure(settings.theme);
-  // Only the flow arrangement consumes the print scene — computing it in topDown
-  // would burn full-tree text measurement on every load for nothing (and its
-  // first-paint cost is what exposed E2E-16's snapshot race on slow CI runners).
-  const scene = useMemo(
-    () =>
-      data.status === 'ready' && settings.arrangement === 'flow'
-        ? flowLayout(data.model, printMeasure)
-        : null,
-    [data, printMeasure, settings.arrangement],
-  );
+  // Only print arrangements consume a print scene — topDown must not pay for
+  // full-tree text measurement (PR ① finding: it exposed E2E-16's snapshot race).
+  const scene = useMemo(() => {
+    if (data.status !== 'ready') return null;
+    if (settings.arrangement === 'flow') return flowLayout(data.model, printMeasure);
+    if (settings.arrangement === 'fan') return fanLayout(data.model, printMeasure);
+    return null;
+  }, [data, printMeasure, settings.arrangement]);
 
   // Never a silently wrong tree (spec §6): if the single-root layout walk couldn't
   // reach everyone in the model (e.g. a rendered child's spouse's own parents form a
@@ -149,10 +148,11 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     return () => window.removeEventListener('beforeprint', onBeforePrint);
   }, [layout, settings.arrangement]);
 
-  // CSS (index.css) keys the print-only sheet visibility off body[data-print-arrangement].
+  // CSS (index.css) keys the print-only sheet visibility off body[data-print-arrangement]
+  // (attribute presence, value-agnostic) — carry the actual arrangement for tooling/tests.
   useEffect(() => {
-    if (settings.arrangement !== 'flow') return;
-    document.body.dataset.printArrangement = 'flow';
+    if (settings.arrangement === 'topDown') return;
+    document.body.dataset.printArrangement = settings.arrangement;
     return () => { delete document.body.dataset.printArrangement; };
   }, [settings.arrangement]);
 
@@ -168,7 +168,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     );
   }
 
-  const isFlow = settings.arrangement === 'flow';
+  const isPrint = printControlsActive(settings);
   const theme = THEMES[settings.theme];
   const size = formatSizeMm(settings);
   const fit = scene ? checkFit(scene.wMm, scene.hMm + TITLE_BLOCK_MM, size, settings.marginMm) : { ok: true as const };
@@ -192,7 +192,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         buildExportSvg(document.querySelector('.print-canvas-svg')!, {
           wMm: size.wMm, hMm: size.hMm, fontCss, background: theme.background,
         }),
-        exportFilename(source.displayName, 'flow', settings.theme, size.wMm, size.hMm),
+        exportFilename(source.displayName, settings.arrangement, settings.theme, size.wMm, size.hMm),
       ),
     ).catch((err: unknown) => {
       // Offline / a 404'd font asset must never be a silent no-op click or an
@@ -215,8 +215,8 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         onPrint={() => window.print()}
         settingsOpen={panelOpen}
         onToggleSettings={() => setPanelOpen((o) => !o)}
-        onExport={isFlow ? handleExport : undefined}
-        exportDisabledReason={isFlow ? exportDisabledReason : undefined}
+        onExport={isPrint ? handleExport : undefined}
+        exportDisabledReason={isPrint ? exportDisabledReason : undefined}
       />
       {panelOpen && <SettingsPanel settings={settings} onChange={changeSettings} />}
       {source.kind === 'demo' && !bannerDismissed && (
@@ -227,32 +227,33 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
           {warnings.map((w, i) => <p key={i}>{w.message}</p>)}
         </div>
       )}
-      {isFlow && !fit.ok && (
+      {isPrint && !fit.ok && (
         // Blocks export only (see exportDisabledReason above) — print (window.print())
         // and the canvas itself keep working regardless, per spec: a fit failure never
         // hides the tree or the ability to print it.
         <div className="warnings" data-testid="fit-refusal">{fit.message}</div>
       )}
-      {isFlow && exportError && (
+      {isPrint && exportError && (
         <div className="warnings" data-testid="export-error">{exportError}</div>
       )}
       <PanZoomViewport
-        contentSize={isFlow && scene
+        contentSize={isPrint && scene
           ? { width: scene.wMm, height: scene.hMm + TITLE_BLOCK_MM }
           : { width: layout!.width, height: layout!.height }}
         onBackgroundClick={() => { setExpandedId(null); setPanelOpen(false); }}
         viewportRef={viewport}
         onScaleChange={setScalePct}
       >
-        {isFlow && scene ? (
+        {isPrint && scene ? (
           <PrintTreeCanvas scene={scene} theme={theme} title={source.displayName}
+            arrangement={settings.arrangement as 'flow' | 'fan'}
             guide={guide} expandedId={expandedId} onToggle={toggleExpanded} />
         ) : (
           <TreeCanvas model={data.model} layout={layout!} settings={settings} nameLines={nameLines}
             expandedId={expandedId} onToggle={toggleExpanded} />
         )}
       </PanZoomViewport>
-      {isFlow && (
+      {isPrint && (
         // The @page rule this injects (id="print-page") beats index.css's unscoped
         // @page{size:landscape} purely by head insertion order — same specificity,
         // later wins — so PrintSheet must stay mounted after main.tsx's stylesheet import.
