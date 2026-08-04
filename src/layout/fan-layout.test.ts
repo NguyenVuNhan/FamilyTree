@@ -298,6 +298,48 @@ describe('fanLayout — collision and bounds invariants', () => {
     assertNoConnectorIntrusion(m, scene);
   }, 30000);
 
+  it('>200-person single-ring overflow: Σ content need still exceeds π even at maxDelta — the honest response is a huge ring, never a silent collapse to base radius (zero OBB overlaps either way)', () => {
+    // 500 direct leaf children of the root couple, each with a 30-char name —
+    // genuinely too much tangential content to fit a 180° arc no matter how
+    // far solveInflation inflates the ring (capped at maxDelta=5000). Before
+    // round 2, the backstop reset δ to 0 whenever this happened, silently
+    // collapsing ring 1 back to base radius (reviewed regression: ring1
+    // 3053→82mm, 4933 overlapping node pairs) even though checkFit
+    // (downstream) is specifically designed to loudly reject an oversized
+    // canvas — collapsing hid the failure instead of surfacing it honestly.
+    const longName = 'x'.repeat(30);
+    const leaves = kids(500, 'k');
+    const m = model([{ id: 'u:a+b', partners: ['a', 'b'], childIds: leaves }], ['a', 'b', ...leaves]);
+    for (const id of leaves) m.persons.set(id, { id, fullName: longName, cleanName: longName });
+    const geo = fanGeometry(m, measure);
+    // δ must stay at its (necessarily large) solved value, not collapse to 0.
+    expect(geo.ringInnerMm[1]).toBeGreaterThan(1000);
+    assertNoOBBOverlap(fanLayout(m, measure));
+  }, 30000);
+
+  it.each([2, 5, 20, 50])('a couple with a long name (nameLen≈60, T well under the ~100mm safe bound) still avoids overlap/intrusion at fanout=%i', (fanout) => {
+    // Pins the SAFE side of the F1 approximation's real limiting variable —
+    // the parent couple's own tangential extent T (wrapped-name capsule
+    // height), not generation depth (verified scale-invariant, 0.000mm
+    // intrusion across depth 1→14, fanout 2→250). nameLen≈60 stays well
+    // under the ~120-char / 6-wrapped-line point where the reviewer first
+    // measured intrusion, across a range of fanouts (varying Δθ).
+    const longName = 'x'.repeat(60);
+    const grandkids = kids(fanout, 'g');
+    const m = model(
+      [
+        { id: 'u:a+b', partners: ['a', 'b'], childIds: ['mid'] },
+        { id: 'u:mid+midw', partners: ['mid', 'midw'], childIds: grandkids },
+      ],
+      ['a', 'b', 'mid', 'midw', ...grandkids],
+    );
+    m.persons.set('mid', { id: 'mid', fullName: longName, cleanName: longName });
+    m.persons.set('midw', { id: 'midw', fullName: longName, cleanName: longName });
+    const scene = fanLayout(m, measure);
+    assertNoOBBOverlap(scene);
+    assertNoConnectorIntrusion(m, scene);
+  });
+
   it('scene bounds contain every rotated corner (canvas/export never crops the fan)', () => {
     const scene = fanLayout(mixedModel(), measure);
     for (const n of scene.nodes) for (const c of nodeCorners(n)) {

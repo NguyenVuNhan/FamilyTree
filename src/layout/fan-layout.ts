@@ -100,12 +100,47 @@ export function fanGeometry(model: FamilyModel, measure: PrintMeasurer): FanGeom
   const rootNeed = (delta: number) =>
     rootChildren.reduce((s, c) => s + Math.max(need(c, 1, delta), effWedge), 0);
   let delta = rootChildren.length > 0 ? solveInflation(rootNeed, PI) : 0;
-  // Defensive backstop: if floors still exceed π at the solved δ (e.g. some
-  // future edge case not covered by the epsilon above), degrade to equal
-  // shares rather than hand waterfill an infeasible Σ floors > span.
+  // Genuine overflow: Σ content need still exceeds π even at solveInflation's
+  // default maxDelta (too much tangential content for a 180° arc). The root's
+  // floors must degrade to equal shares (feasibleFloors, below) so waterfill
+  // stays solvable — but an equal share is a FIXED, delta-independent value;
+  // by itself it doesn't guarantee any branch's actual angular need fits it.
+  // Re-solve δ against that equal share directly (with a far larger ceiling,
+  // since this simpler per-branch target converges at a different — often
+  // larger — δ than the aggregate one just tried): that keeps every branch's
+  // own content honestly inside the wedge it's actually given, instead of
+  // silently overlapping neighbors while still LOOKING like a huge, sane-ish
+  // canvas. Round 1 instead reset δ to 0 outright here — collapsing every
+  // ring back to base radius and hiding the overlaps behind an even MORE
+  // plausible canvas (the reviewed regression: 500 leaves × 30-char names,
+  // ring1 3053→82mm, 4933 overlapping pairs).
   const rootFloorsOverflow = rootChildren.length > 0 && rootNeed(delta) > PI;
-  if (rootFloorsOverflow) delta = 0;
+  if (rootFloorsOverflow) {
+    const equalShare = (PI * (1 - 1e-9)) / rootChildren.length;
+    const maxChildNeed = (d: number) => Math.max(...rootChildren.map((c) => need(c, 1, d)));
+    delta = solveInflation(maxChildNeed, equalShare, 1_000_000);
+  }
   const ringInnerMm = baseRing.map((r) => r + delta);
+
+  // Guards a waterfill call's precondition (Σ floors <= span). This normally
+  // holds by construction: need() is recursively >= the sum of its own
+  // children's needs, so once a branch's assigned span covers its own
+  // need(), that automatically covers its children's needs too, propagating
+  // down through the whole recursion. But when even δ's solved (possibly
+  // maxDelta-capped) value can't bring the ROOT'S total need under π, the
+  // root itself must degrade its floors to equal shares — and once a
+  // branch's actual span no longer matches its own need(), that guarantee no
+  // longer propagates to ITS children either, so a nested waterfill can
+  // receive an infeasible Σ floor > span too (spans that don't sum to span,
+  // spilling wedges into siblings). Re-apply the same degrade-to-equal-shares
+  // strategy at whichever level the invariant actually breaks — root or any
+  // nested call — so no waterfill call is ever handed an infeasible set.
+  const feasibleFloors = (span: number, items: SectorItem[]): SectorItem[] => {
+    const totalFloor = items.reduce((s, it) => s + it.floorRad, 0);
+    if (totalFloor <= span) return items;
+    const equalShare = (span * (1 - 1e-9)) / items.length;
+    return items.map((it) => ({ ...it, floorRad: equalShare }));
+  };
 
   // 4 — recursive sector assignment + placement (hub-centered; sectors run
   // left→right: startRad > endRad, both in [0, π])
@@ -153,14 +188,20 @@ export function fanGeometry(model: FamilyModel, measure: PrintMeasurer): FanGeom
       // radius draws a chord across the wedge that dips inside rP whenever Δθ
       // is non-trivial — re-entering the parent's own capsule (the critical
       // finding). Model the transition as a logarithmic spiral
-      // r(θ) = rP·e^{k(θ−θP)} — radius is strictly monotonic in θ, so it
-      // can never dip below rP or overshoot r — and convert it to a cubic via
-      // Hermite matching (endpoint positions + the spiral's own tangent at
-      // each end). This tracks the spiral closely for the sub-90° sweeps this
-      // tree can ever produce (a child's own sub-wedge mid is at most half of
-      // its parent's wedge, and a wedge is at most π wide — see rootChildren
-      // below) — unlike the old same-ray chord, whose dip (rP·(1−cos(Δθ/2)))
-      // grows to tens of mm for a wide sweep.
+      // r(θ) = rP·e^{k(θ−θP)} — the IDEAL spiral's radius is strictly
+      // monotonic in θ, never dipping below rP or overshooting r — and
+      // convert it to a cubic via Hermite matching (endpoint positions + the
+      // spiral's own tangent at each end). The cubic is only an
+      // APPROXIMATION of that spiral, not the spiral itself: it DOES dip
+      // below rP away from θP (measured −20 to −65mm at extreme fanout/depth)
+      // — but by the time it does, the curve has swept well clear of the
+      // parent's own angular position, so there's no capsule there to
+      // re-enter. This tracks the spiral closely enough for the sub-90°
+      // sweeps this tree can ever produce (a child's own sub-wedge mid is at
+      // most half of its parent's wedge, and a wedge is at most π wide — see
+      // rootChildren below) — unlike the old same-ray chord, whose dip
+      // (rP·(1−cos(Δθ/2))) happens RIGHT AT θP, squarely inside the parent's
+      // own capsule, and grows to tens of mm for a wide sweep.
       const k = Math.log(r / rP) / dTheta;
       const tangentAt = (theta: number, radius: number) => ({
         x: radius * (k * Math.cos(theta) - Math.sin(theta)),
@@ -174,10 +215,10 @@ export function fanGeometry(model: FamilyModel, measure: PrintMeasurer): FanGeom
     edges.push({ fromId: parentFromId, toId: ids[0], pts: [parentAnchor, c1, c2, target] });
 
     if (n.kind !== 'union' || n.children.length === 0) return;
-    const items: SectorItem[] = n.children.map((c) => ({
+    const items: SectorItem[] = feasibleFloors(startRad - endRad, n.children.map((c) => ({
       weight: personCount(c),
       floorRad: need(c, gen + 1, delta),
-    }));
+    })));
     const spans = waterfill(startRad - endRad, items);
     // F1 fix: give the anchor real clearance over the widest partner instead
     // of sitting exactly on its outer edge (zero clearance was the other half
@@ -193,11 +234,10 @@ export function fanGeometry(model: FamilyModel, measure: PrintMeasurer): FanGeom
   };
 
   if (root.kind === 'union' && rootChildren.length > 0) {
-    const equalShare = (PI * (1 - 1e-9)) / rootChildren.length;
-    const items: SectorItem[] = rootChildren.map((c) => ({
+    const items: SectorItem[] = feasibleFloors(PI, rootChildren.map((c) => ({
       weight: personCount(c),
-      floorRad: rootFloorsOverflow ? equalShare : Math.max(need(c, 1, delta), effWedge),
-    }));
+      floorRad: Math.max(need(c, 1, delta), effWedge),
+    })));
     const spans = waterfill(PI, items);
     let cursor = PI;
     for (const [i, child] of rootChildren.entries()) {
