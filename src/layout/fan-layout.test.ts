@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FamilyModel, Person, Union } from '../data/types';
-import { printUnplacedIds, type PrintMeasurer, type PrintNode } from './flow-layout';
+import { printUnplacedIds, type PrintMeasurer, type PrintNode, type PrintScene } from './flow-layout';
 import {
   COUPLE_ARC_GAP_MM, MIN_WEDGE_DEG, fanGeometry, fanLayout, nodeCorners,
 } from './fan-layout';
@@ -58,6 +58,55 @@ function insideNode(n: PrintNode, px: number, py: number): boolean {
   const lx = dx * Math.cos(rot) - dy * Math.sin(rot);
   const ly = dx * Math.sin(rot) + dy * Math.cos(rot);
   return lx >= 0 && lx <= n.wMm && ly >= 0 && ly <= n.hMm;
+}
+
+/** ~200-person wide tree, sized via a dominant branch (rootKids=2, kidsEach up
+ *  to 194 leaves): one branch captures nearly the whole semicircle, so its own
+ *  children fan out at large Δθ from its own wedge mid — the same shape as
+ *  the reviewer's F1 repro (root couple → child couple → many grandchildren),
+ *  scaled up to stress SAT overlap and the connector sweep at scale (F3.2). */
+function wideModel(kidsEach = 196): FamilyModel {
+  const dominantKids = kids(kidsEach, 'k');
+  return model(
+    [
+      { id: 'u:a+b', partners: ['a', 'b'], childIds: ['big', 'solo'] },
+      { id: 'u:big+bw', partners: ['big', 'bw'], childIds: dominantKids },
+    ],
+    ['a', 'b', 'big', 'bw', 'solo', ...dominantKids],
+  );
+}
+
+function assertNoOBBOverlap(scene: PrintScene): void {
+  for (const a of scene.nodes) for (const b of scene.nodes) {
+    if (a === b) continue;
+    expect(overlapOBB(nodeCorners(a), nodeCorners(b)), `${a.personId} vs ${b.personId}`).toBe(false);
+  }
+}
+
+/** 65-sample bézier sweep vs every non-endpoint capsule. Only the edge's own
+ *  target (and, for hub edges springing straight from the root couple block,
+ *  the root couple itself — the shared anchor sits exactly on that block's
+ *  boundary) may be legitimately touched; every other capsule — INCLUDING the
+ *  edge's own source partners — must never be entered (F3.1: the old skip set
+ *  exempted exactly the capsules F1's bad curve hit, hiding the defect). */
+function assertNoConnectorIntrusion(m: FamilyModel, scene: PrintScene): void {
+  const partnersOf = new Map(m.unions.map((u) => [u.id, u.partners as readonly string[]]));
+  const rootPartners = new Set(m.rootId.startsWith('p:') ? [] : (partnersOf.get(m.rootId) ?? []));
+  for (const e of scene.edges) {
+    const nums = e.d.match(/-?\d+(\.\d+)?(e[+-]?\d+)?/gi)!.map(Number);
+    expect(nums).toHaveLength(8); // M x y C x1 y1 x2 y2 x y
+    const P = [nums[0], nums[1]], c1 = [nums[2], nums[3]], c2 = [nums[4], nums[5]], T = [nums[6], nums[7]];
+    const skip = new Set<string>([e.toId, ...(e.fromId === m.rootId ? rootPartners : [])]);
+    for (let s = 0; s <= 64; s++) {
+      const t = s / 64, u = 1 - t;
+      const px = u * u * u * P[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * T[0];
+      const py = u * u * u * P[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * T[1];
+      for (const n of scene.nodes) {
+        if (skip.has(n.personId)) continue;
+        expect(insideNode(n, px, py), `edge ${e.fromId}→${e.toId} enters ${n.personId} at t=${t.toFixed(3)}`).toBe(false);
+      }
+    }
+  }
 }
 
 describe('fanLayout — hub and rings', () => {
@@ -172,11 +221,37 @@ describe('fanLayout — sectors', () => {
       ['a', 'b', 'big', 'bw', 'solo', ...dense],
     );
     const geo = fanGeometry(m, measure);
-    // 40 leaf capsules cannot share ring 2 at the base radius — Δ must have pushed ring 1 well out.
+    // 40 leaf capsules cannot share ring 2 at the base radius — Δ must have pushed ring 1 well out,
+    // but this specific overflow needs only a modest, bounded Δ (F3.3: a one-sided lower bound alone
+    // let a maxDelta blowup slip through as "greater than 100").
     expect(geo.ringInnerMm[1]).toBeGreaterThan(100);
+    expect(geo.ringInnerMm[1]).toBeLessThan(1000);
     // and every node still uses the tier font (never shrunk):
     const scene = fanLayout(m, measure);
     for (const n of scene.nodes.filter((x) => x.generation === 2)) expect(n.fontMm).toBe(8.7);
+  });
+
+  it('>=19 equal-weight root branches (the wedge-floor/π float-noise boundary): rings stay sane', () => {
+    // Each branch is a single tiny leaf, so its own content need is well below
+    // the MIN_WEDGE_DEG floor — every branch is pinned at exactly π/n. At
+    // n>=19 (10° > 180°/19), n * (π/n) hits π almost exactly, and float
+    // round-off can push the sum a hair above it. Before F2, that made
+    // `rootNeed(delta) <= π` false for every δ tried, so solveInflation fell
+    // through to its unchecked maxDelta=5000 and ring 1 exploded (measured
+    // ~5052mm at n=21/25/30 in the review's repro).
+    const branchCount = 21;
+    const longName = 'x'.repeat(80); // inflate the root block so per-branch content need < the floor
+    const rootKids = kids(branchCount, 'c');
+    const m = model(
+      [{ id: 'u:a+b', partners: ['a', 'b'], childIds: rootKids }],
+      ['a', 'b', ...rootKids],
+    );
+    m.persons.set('a', { id: 'a', fullName: longName, cleanName: longName });
+    m.persons.set('b', { id: 'b', fullName: longName, cleanName: longName });
+    const geo = fanGeometry(m, measure);
+    expect(geo.ringInnerMm[1]).toBeLessThan(500);
+    const totalSpan = geo.rootSectors.reduce((s, x) => s + (x.startRad - x.endRad), 0);
+    expect(totalSpan).toBeCloseTo(Math.PI, 6); // wedges still tile the semicircle exactly
   });
 
   it('ring couples sit tangentially adjacent with the couple arc gap, partners[0] on the left', () => {
@@ -212,12 +287,16 @@ describe('fanLayout — collision and bounds invariants', () => {
   });
 
   it('no rotated capsule boxes overlap anywhere (SAT over corner quads)', () => {
-    const scene = fanLayout(mixedModel(), measure);
-    for (const a of scene.nodes) for (const b of scene.nodes) {
-      if (a === b) continue;
-      expect(overlapOBB(nodeCorners(a), nodeCorners(b)), `${a.personId} vs ${b.personId}`).toBe(false);
-    }
+    assertNoOBBOverlap(fanLayout(mixedModel(), measure));
   });
+
+  it('holds at scale (~200 people): no OBB overlaps and no connector-capsule intrusions', () => {
+    const m = wideModel();
+    const scene = fanLayout(m, measure);
+    expect(scene.nodes.length).toBeGreaterThanOrEqual(200);
+    assertNoOBBOverlap(scene);
+    assertNoConnectorIntrusion(m, scene);
+  }, 30000);
 
   it('scene bounds contain every rotated corner (canvas/export never crops the fan)', () => {
     const scene = fanLayout(mixedModel(), measure);
@@ -231,23 +310,7 @@ describe('fanLayout — collision and bounds invariants', () => {
 
   it('connectors never enter a non-endpoint capsule (65-sample bézier sweep vs rotated rects)', () => {
     const m = mixedModel();
-    const scene = fanLayout(m, measure);
-    const partnersOf = new Map(m.unions.map((u) => [u.id, u.partners as readonly string[]]));
-    for (const e of scene.edges) {
-      const nums = e.d.match(/-?\d+(\.\d+)?(e[+-]?\d+)?/gi)!.map(Number);
-      expect(nums).toHaveLength(8); // M x y C x1 y1 x2 y2 x y
-      const P = [nums[0], nums[1]], c1 = [nums[2], nums[3]], c2 = [nums[4], nums[5]], T = [nums[6], nums[7]];
-      const skip = new Set([...(partnersOf.get(e.fromId) ?? []), e.toId]);
-      for (let s = 0; s <= 64; s++) {
-        const t = s / 64, u = 1 - t;
-        const px = u * u * u * P[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * T[0];
-        const py = u * u * u * P[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * T[1];
-        for (const n of scene.nodes) {
-          if (skip.has(n.personId)) continue;
-          expect(insideNode(n, px, py), `edge ${e.fromId}→${e.toId} enters ${n.personId} at t=${t.toFixed(3)}`).toBe(false);
-        }
-      }
-    }
+    assertNoConnectorIntrusion(m, fanLayout(m, measure));
   });
 
   it('edges carry union→first-partner ids and a single cubic', () => {

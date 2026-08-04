@@ -90,10 +90,21 @@ export function fanGeometry(model: FamilyModel, measure: PrintMeasurer): FanGeom
   const rootChildren = root.kind === 'union' ? root.children : [];
   // A pathological root (> 18 branches at the 10° floor) can't honor the full
   // wedge — degrade to an equal share so floors stay feasible (never blocking).
-  const effWedge = rootChildren.length > 0 ? Math.min(MIN_WEDGE_RAD, PI / rootChildren.length) : 0;
+  // Shave a relative 1e-9 off π: at n>=19, n*(π/n) can land a hair ABOVE π after
+  // float round-off (verified empirically at n=19..30), which without this
+  // epsilon made `rootNeed(delta) <= π` false for every δ — solveInflation then
+  // fell through to its unchecked maxDelta and ring 1 exploded (~5000mm, F2).
+  const effWedge = rootChildren.length > 0
+    ? Math.min(MIN_WEDGE_RAD, (PI * (1 - 1e-9)) / rootChildren.length)
+    : 0;
   const rootNeed = (delta: number) =>
     rootChildren.reduce((s, c) => s + Math.max(need(c, 1, delta), effWedge), 0);
-  const delta = rootChildren.length > 0 ? solveInflation(rootNeed, PI) : 0;
+  let delta = rootChildren.length > 0 ? solveInflation(rootNeed, PI) : 0;
+  // Defensive backstop: if floors still exceed π at the solved δ (e.g. some
+  // future edge case not covered by the epsilon above), degrade to equal
+  // shares rather than hand waterfill an infeasible Σ floors > span.
+  const rootFloorsOverflow = rootChildren.length > 0 && rootNeed(delta) > PI;
+  if (rootFloorsOverflow) delta = 0;
   const ringInnerMm = baseRing.map((r) => r + delta);
 
   // 4 — recursive sector assignment + placement (hub-centered; sectors run
@@ -128,8 +139,38 @@ export function fanGeometry(model: FamilyModel, measure: PrintMeasurer): FanGeom
     const target = polarPoint(0, 0, r, thetas[0]);
     const rP = Math.hypot(parentAnchor.x, parentAnchor.y);
     const thetaP = rP > 0 ? Math.atan2(-parentAnchor.y, parentAnchor.x) : thetas[0];
-    const c1 = polarPoint(0, 0, rP + (r - rP) / 3, thetaP);
-    const c2 = polarPoint(0, 0, r - (r - rP) / 3, thetas[0]);
+    const dTheta = thetas[0] - thetaP;
+    let c1: { x: number; y: number };
+    let c2: { x: number; y: number };
+    if (rP <= 0 || Math.abs(dTheta) < 1e-6) {
+      // No real angular sweep (root edges spring from the hub at rP=0; a lone
+      // child inheriting its parent's full wedge keeps the same mid) — a
+      // plain radial-blend cubic is both correct and trivially safe.
+      c1 = polarPoint(0, 0, rP + (r - rP) / 3, thetaP);
+      c2 = polarPoint(0, 0, r - (r - rP) / 3, thetas[0]);
+    } else {
+      // F1 fix: putting c1/c2 on their own rays with a LINEARLY blended
+      // radius draws a chord across the wedge that dips inside rP whenever Δθ
+      // is non-trivial — re-entering the parent's own capsule (the critical
+      // finding). Model the transition as a logarithmic spiral
+      // r(θ) = rP·e^{k(θ−θP)} — radius is strictly monotonic in θ, so it
+      // can never dip below rP or overshoot r — and convert it to a cubic via
+      // Hermite matching (endpoint positions + the spiral's own tangent at
+      // each end). This tracks the spiral closely for the sub-90° sweeps this
+      // tree can ever produce (a child's own sub-wedge mid is at most half of
+      // its parent's wedge, and a wedge is at most π wide — see rootChildren
+      // below) — unlike the old same-ray chord, whose dip (rP·(1−cos(Δθ/2)))
+      // grows to tens of mm for a wide sweep.
+      const k = Math.log(r / rP) / dTheta;
+      const tangentAt = (theta: number, radius: number) => ({
+        x: radius * (k * Math.cos(theta) - Math.sin(theta)),
+        y: -radius * (k * Math.sin(theta) + Math.cos(theta)),
+      });
+      const tP = tangentAt(thetaP, rP);
+      const tT = tangentAt(thetas[0], r);
+      c1 = { x: parentAnchor.x + (dTheta / 3) * tP.x, y: parentAnchor.y + (dTheta / 3) * tP.y };
+      c2 = { x: target.x - (dTheta / 3) * tT.x, y: target.y - (dTheta / 3) * tT.y };
+    }
     edges.push({ fromId: parentFromId, toId: ids[0], pts: [parentAnchor, c1, c2, target] });
 
     if (n.kind !== 'union' || n.children.length === 0) return;
@@ -138,7 +179,11 @@ export function fanGeometry(model: FamilyModel, measure: PrintMeasurer): FanGeom
       floorRad: need(c, gen + 1, delta),
     }));
     const spans = waterfill(startRad - endRad, items);
-    const rOuter = r + Math.max(...ids.map((id) => caps.get(id)!.wMm));
+    // F1 fix: give the anchor real clearance over the widest partner instead
+    // of sitting exactly on its outer edge (zero clearance was the other half
+    // of the parent-capsule intrusion — even a purely radial curve starting
+    // ON the capsule boundary offers no margin against float noise).
+    const rOuter = r + Math.max(...ids.map((id) => caps.get(id)!.wMm)) + NODE_ARC_GAP_MM / 2;
     const anchor = polarPoint(0, 0, rOuter, mid);
     let cursor = startRad;
     for (const [i, child] of n.children.entries()) {
@@ -148,9 +193,10 @@ export function fanGeometry(model: FamilyModel, measure: PrintMeasurer): FanGeom
   };
 
   if (root.kind === 'union' && rootChildren.length > 0) {
+    const equalShare = (PI * (1 - 1e-9)) / rootChildren.length;
     const items: SectorItem[] = rootChildren.map((c) => ({
       weight: personCount(c),
-      floorRad: Math.max(need(c, 1, delta), effWedge),
+      floorRad: rootFloorsOverflow ? equalShare : Math.max(need(c, 1, delta), effWedge),
     }));
     const spans = waterfill(PI, items);
     let cursor = PI;
