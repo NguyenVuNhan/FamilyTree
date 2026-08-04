@@ -302,6 +302,9 @@ describe('fan arrangement (UC-77, PR ②)', () => {
     expect(svg.getAttribute('data-arrangement')).toBe('fan');
     expect(screen.getByTestId('print-sheet')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export SVG' })).toBeEnabled();
+    // Fan-only fact: a rotated capsule transform, which flowLayout never emits —
+    // proves the fan branch actually ran fanLayout, not flowLayout under a fan label.
+    expect(document.querySelector('.person-node[transform*="rotate("]')).toBeTruthy();
   });
 
   it('fit refusal fires on fan too — legibility floor first, then refuse (a4 + wide tree)', async () => {
