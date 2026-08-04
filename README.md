@@ -41,14 +41,14 @@ silhouettes), connector shape, and spacing sliders. Choices are saved per family
 
 The gear button's settings panel includes an **Arrangement** setting: **Top-down** (the default pan/zoom tree), **Scroll**, or **Fan**. Switching to Scroll or Fan turns on print mode and reveals the rest of the print controls:
 
-- **Fan** lays the tree out as an Ancestral Fan: a 180° semicircle with the founding couple bottom-center and each generation forming a ring further out. Branch wedges are sized by descendant count, with a 10° minimum so small branches stay visible, and labels read outward along the radius, auto-flipping past vertical so nothing prints upside-down. A fan reads best wide and shallow — the panel hints when the current format is narrower than the recommended 2:1 landscape.
+- **Fan** lays the tree out as an Ancestral Fan: a 180° semicircle with the founding couple bottom-center and each generation forming a ring further out. Branch wedges are sized by descendant count, with a 10° minimum so small branches stay visible, and labels read outward along the radius, auto-flipping past vertical so nothing prints upside-down. A fan reads best wide and shallow — the panel recommends a 2:1 landscape format and hints when the selected format is square-ish (width less than 1.2× height).
 
 - **Theme** — four print-only visual themes, each with its own type pairing and accent color: Indochine Vintage, Nordic Minimalist, Traditional Ink Wash, Royal Botanical.
 - **Format** — page-size presets A4, A3, A1, A0, Panorama (120×60 cm), Square (90×90 cm), or Custom (any size from 300mm up to 2000×1200mm).
 - **Margin** — a safe margin slider, 50–70mm (default 60mm), kept clear of content on every edge.
 - **Frame guide** — a toggle that overlays the page/margin frame on the canvas so you can check composition before exporting, without it appearing in the export itself.
 
-**Export SVG** downloads a self-contained SVG of the current Scroll layout: dimensions are mm-true (SVG units equal millimeters, so the file measures correctly in any vector or print tool), all theme fonts are embedded inline (base64 `@font-face`, no external font requests), and a 100mm calibration bar is drawn in the corner so anyone opening the file can verify their viewer is rendering it at true scale. Nothing in the exported file depends on network access.
+**Export SVG** downloads a self-contained SVG of the current print layout (Scroll or Fan): dimensions are mm-true (SVG units equal millimeters, so the file measures correctly in any vector or print tool), all theme fonts are embedded inline (base64 `@font-face`, no external font requests), and a 100mm calibration bar is drawn in the corner so anyone opening the file can verify their viewer is rendering it at true scale. Nothing in the exported file depends on network access.
 
 For an on-screen/paper copy instead of a file, use the browser's own **Print** (Ctrl/Cmd+P) — for large formats (A1, A0, Panorama, big Custom sizes) most browsers can't drive a physical printer at that size, so treat browser print as **Save as PDF** and send the PDF to a print shop; A4/A3 can go to a physical printer directly.
 
