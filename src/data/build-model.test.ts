@@ -103,4 +103,13 @@ describe('buildModel', () => {
     expect(model.persons.get('b')!.gender).toBeUndefined();
     expect(model.persons.get('c')!.gender).toBeUndefined();
   });
+
+  it('passes year fields through to Person', () => {
+    const rows: PersonRow[] = [{
+      rowNumber: 2, id: 'r2', fullName: 'Anh (1950–2001)', cleanName: 'Anh',
+      birthYear: 1950, deathYear: 2001, image: '', gender: '', partnerId: '', parentIds: [],
+    }];
+    const model = buildModel(rows);
+    expect(model.persons.get('r2')).toMatchObject({ cleanName: 'Anh', birthYear: 1950, deathYear: 2001 });
+  });
 });

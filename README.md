@@ -18,7 +18,7 @@ The sheet is a **staircase outline** — exactly how a family tree is written in
 
 Rules:
 
-- **One person (plus partner) per row, in exactly one generation column.** Write the couple in a single cell: `Name + Partner` (a `–` dash also works). Anything else in the cell — birth years like `(1932)`, alternate names — is shown as-is.
+- **One person (plus partner) per row, in exactly one generation column.** Write the couple in a single cell: `Name + Partner` (a `–` dash also works). Add birth/death years as a trailing `(...)` on each person's own name segment, e.g. `Nguyễn Văn Trường (1928–1996) + Trần Thị Hồng Gấm (1932–2011)`. Four shapes are recognized: `(1950)` (birth only), `(1950–)` (living, birth known), `(–2001)` (death only), `(1950–2001)` (both). Anything else in the trailing parentheses — an alternate name, a nickname, non-year text — is not a year and stays part of the displayed name as-is.
 - **Children go directly under their parents, one column to the right.** A row's parent is the nearest row above it in the previous column. After finishing one branch, simply step back out to the shallower column (like Võ Thị Ánh above).
 - **Generations are unlimited** — need a `Đời 9`? Just add a column. Generation column headers can say anything (`Đời 1`, `Gen 1`, …); only `Image`, `PartnerImage`, `Gender`, and `PartnerGender` are reserved names.
 - **`Image` / `PartnerImage`** hold the photo for the row's person / partner (see [Image rules](#image-rules)). The `Image` column must exist (cells may be empty).
@@ -36,6 +36,23 @@ The gear button in the toolbar opens layout settings: card style (Classic / Circ
 what cards show (Full / Name / Avatar), name position, placeholder style (initials or illustrated
 silhouettes), connector shape, and spacing sliders. Choices are saved per family in your browser
 (localStorage) and apply instantly; Reset restores the defaults.
+
+### Print & export
+
+The gear button's settings panel includes an **Arrangement** setting: **Top-down** (the default pan/zoom tree) or **Scroll**. Switching to Scroll turns on print mode and reveals the rest of the print controls:
+
+- **Theme** — four print-only visual themes, each with its own type pairing and accent color: Indochine Vintage, Nordic Minimalist, Traditional Ink Wash, Royal Botanical.
+- **Format** — page-size presets A4, A3, A1, A0, Panorama (120×60 cm), Square (90×90 cm), or Custom (any size from 300mm up to 2000×1200mm).
+- **Margin** — a safe margin slider, 50–70mm (default 60mm), kept clear of content on every edge.
+- **Frame guide** — a toggle that overlays the page/margin frame on the canvas so you can check composition before exporting, without it appearing in the export itself.
+
+**Export SVG** downloads a self-contained SVG of the current Scroll layout: dimensions are mm-true (SVG units equal millimeters, so the file measures correctly in any vector or print tool), all theme fonts are embedded inline (base64 `@font-face`, no external font requests), and a 100mm calibration bar is drawn in the corner so anyone opening the file can verify their viewer is rendering it at true scale. Nothing in the exported file depends on network access.
+
+For an on-screen/paper copy instead of a file, use the browser's own **Print** (Ctrl/Cmd+P) — for large formats (A1, A0, Panorama, big Custom sizes) most browsers can't drive a physical printer at that size, so treat browser print as **Save as PDF** and send the PDF to a print shop; A4/A3 can go to a physical printer directly.
+
+Every tree has a legibility floor — the smallest generation's names must stay readable (≥6.5mm tall, the size that's still legible from about a meter away) — so a single Scroll panorama can only fit so many people (roughly 35, depending on name lengths and tree shape) before it stops fitting. If the current format is too small, the panel refuses with the minimum page size the tree actually needs, so you can pick a bigger format or go Custom. Export SVG is also blocked, listing the people by name, whenever someone can't be placed at all or sits in a disconnected part of the family (not connected to the main tree) — connect or remove them first. There's no multi-page/multi-panel export yet; very large families should be split into smaller sheets, or wait for a future multi-panel arrangement.
+
+Your share link (see [Link reference](#link-reference)) carries the arrangement, theme, format, margin, and frame-guide choices along with the rest of your layout view, so anyone opening it sees the same print setup you configured.
 
 ### Publishing and sharing your sheet
 
@@ -104,3 +121,6 @@ Run these by hand before/after a release — they aren't automatable in CI:
 - [ ] Google Sheets publish-to-web round-trip with a live sheet (edit a cell, confirm it appears on refresh with no redeploy)
 - [ ] Staircase round-trip with a live sheet: add a person under a parent, refresh, confirm placement; make a deliberate depth-jump mistake, confirm the row-numbered error
 - [ ] Paste-to-share round-trip with a live sheet: publish a real sheet, paste its URL into the dialog, copy the share link from the toolbar, open it in a private window, confirm the tree renders
+- [ ] FOGRA39/GRACoL soft-proof of an exported SVG for each of the 4 print themes, in your print tool of choice, before a real print run
+- [ ] One physical proof print per theme, checked against the soft-proof and against the on-screen theme colors
+- [ ] Real print dialog (Ctrl/Cmd+P) on the Scroll arrangement at A4 and A3, checking the printed page against the on-screen frame guide

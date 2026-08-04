@@ -9,7 +9,7 @@ describe('parseStaircase — header classification', () => {
     const { rows, errors, warnings } = parseStaircase('Đời 1,Image\nAnn Lee,');
     expect(errors).toEqual([]);
     expect(warnings).toEqual([]);
-    expect(rows).toEqual([{ rowNumber: 2, id: 'r2', fullName: 'Ann Lee', image: '', gender: '', partnerId: '', parentIds: [] }]);
+    expect(rows).toEqual([{ rowNumber: 2, id: 'r2', fullName: 'Ann Lee', cleanName: 'Ann Lee', image: '', gender: '', partnerId: '', parentIds: [] }]);
   });
 
   it('matches reserved headers case-insensitively and maps Image cells', () => {
@@ -49,8 +49,8 @@ describe('parseStaircase — couples and separators', () => {
   it('splits "Name + Partner" into two persons wired as a couple', () => {
     const { rows } = parseStaircase('Đời 1,Image\nAnn Lee + Bob Lee,');
     expect(rows).toEqual([
-      { rowNumber: 2, id: 'r2', fullName: 'Ann Lee', image: '', gender: '', partnerId: 'r2p', parentIds: [] },
-      { rowNumber: 2, id: 'r2p', fullName: 'Bob Lee', image: '', gender: '', partnerId: '', parentIds: [] },
+      { rowNumber: 2, id: 'r2', fullName: 'Ann Lee', cleanName: 'Ann Lee', image: '', gender: '', partnerId: 'r2p', parentIds: [] },
+      { rowNumber: 2, id: 'r2p', fullName: 'Bob Lee', cleanName: 'Bob Lee', image: '', gender: '', partnerId: '', parentIds: [] },
     ]);
   });
 
@@ -202,5 +202,37 @@ describe('parseStaircase — unbounded generation depth', () => {
     const { rows, errors } = parseStaircase('Đời 1,Image,Đời 2\nAnn Lee,,\n,,Kid One');
     expect(errors).toEqual([]);
     expect(rows[1]).toEqual(expect.objectContaining({ id: 'r3', fullName: 'Kid One', parentIds: ['r2'] }));
+  });
+});
+
+describe('years in name cells', () => {
+  it('en-dash inside a year range does not split the couple', () => {
+    const csv = 'Image,Gen 1\n,Nguyễn Văn Trường (1928–1996) + Trần Thị Hồng Gấm (1932–2011)';
+    const { rows, errors } = parseStaircase(csv);
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      fullName: 'Nguyễn Văn Trường (1928–1996)', cleanName: 'Nguyễn Văn Trường',
+      birthYear: 1928, deathYear: 1996,
+    });
+    expect(rows[1]).toMatchObject({
+      fullName: 'Trần Thị Hồng Gấm (1932–2011)', cleanName: 'Trần Thị Hồng Gấm',
+      birthYear: 1932, deathYear: 2011,
+    });
+  });
+
+  it('en-dash SEPARATOR still works when years use parens', () => {
+    const csv = 'Image,Gen 1\n,Anh (1950) – Bích (–1999)';
+    const { rows } = parseStaircase(csv);
+    expect(rows.map((r) => r.cleanName)).toEqual(['Anh', 'Bích']);
+    expect(rows[0].birthYear).toBe(1950);
+    expect(rows[1].deathYear).toBe(1999);
+  });
+
+  it('no years → cleanName equals fullName, year fields absent', () => {
+    const csv = 'Image,Gen 1\n,Mai-Anh + Bảo';
+    const { rows } = parseStaircase(csv);
+    expect(rows[0]).toMatchObject({ fullName: 'Mai-Anh', cleanName: 'Mai-Anh' });
+    expect(rows[0].birthYear).toBeUndefined();
   });
 });

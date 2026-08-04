@@ -2,7 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: 'tests/e2e',
-  testIgnore: '**/smoke/**',
+  // '*.test.ts' files under fixtures/ are vitest unit tests (run via `npm test`),
+  // not Playwright specs — Playwright's default testMatch would otherwise pick
+  // them up since it matches both *.spec.ts and *.test.ts.
+  testIgnore: ['**/smoke/**', '**/*.test.ts'],
   fullyParallel: true,
   ignoreSnapshots: !!process.env.CI, // visual regression is a local guard (per-platform baselines)
   reporter: process.env.CI ? [['html', { open: 'never' }]] : 'list',

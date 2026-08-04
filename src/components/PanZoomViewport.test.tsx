@@ -30,6 +30,17 @@ function setupWithCard(onBackgroundClick = vi.fn()) {
   return { onBackgroundClick, vp: screen.getByTestId('viewport'), card: screen.getByRole('button') };
 }
 
+// Flow arrangement's PrintTreeCanvas nodes are `g.person-node`, not `.person-card` —
+// they need the same "started on the node" protection (Finding 1 fix).
+function setupWithFlowNode(onBackgroundClick = vi.fn()) {
+  render(
+    <PanZoomViewport contentSize={{ width: 500, height: 400 }} onBackgroundClick={onBackgroundClick}>
+      <button className="person-node">node</button>
+    </PanZoomViewport>,
+  );
+  return { onBackgroundClick, node: screen.getByRole('button') };
+}
+
 describe('PanZoomViewport', () => {
   it('mounts fitted and centered (scale 1, centered translate)', () => {
     const { transform } = setup();
@@ -73,6 +84,13 @@ describe('PanZoomViewport', () => {
     const { onBackgroundClick, vp, card } = setupWithCard();
     fireEvent.pointerDown(card, { clientX: 5, clientY: 5, pointerId: 1, button: 0 });
     fireEvent.pointerUp(vp, { clientX: 5, clientY: 5, pointerId: 1 });
+    expect(onBackgroundClick).not.toHaveBeenCalled();
+  });
+
+  it('a clean click that started on a flow node (.person-node) does not call onBackgroundClick', () => {
+    const { onBackgroundClick, node } = setupWithFlowNode();
+    fireEvent.pointerDown(node, { clientX: 5, clientY: 5, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(node, { clientX: 5, clientY: 5, pointerId: 1 });
     expect(onBackgroundClick).not.toHaveBeenCalled();
   });
 

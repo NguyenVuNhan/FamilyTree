@@ -61,4 +61,16 @@ describe('Toolbar', () => {
     rerender(<Toolbar {...base} shareLink="https://host.example/?family=demo" />);
     expect(screen.getByRole('button', { name: 'Copy share link' })).toBeInTheDocument();
   });
+
+  it('export button renders only when handler given; disabled with reason', async () => {
+    const onExport = vi.fn();
+    const { rerender } = render(<Toolbar {...noop} title="T" scalePct={100} />);
+    expect(screen.queryByRole('button', { name: 'Export SVG' })).toBeNull();
+    rerender(<Toolbar {...noop} title="T" scalePct={100} onExport={onExport} exportDisabledReason={null} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Export SVG' }));
+    expect(onExport).toHaveBeenCalled();
+    rerender(<Toolbar {...noop} title="T" scalePct={100} onExport={onExport} exportDisabledReason="blocked" />);
+    expect(screen.getByRole('button', { name: 'Export SVG' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Export SVG' })).toHaveAttribute('title', 'blocked');
+  });
 });

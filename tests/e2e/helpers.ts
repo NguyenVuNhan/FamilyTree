@@ -31,6 +31,23 @@ export function treeUrl(sheetUrl: string, name?: string): string {
   return `/?${params.toString()}`;
 }
 
+/** `treeUrl` plus a raw (unencoded) `view=` value — for tests that need to land directly
+ *  on a non-default print arrangement/theme/format/margin without driving the panel UI. */
+export function viewUrl(sheetUrl: string, view: string, name?: string): string {
+  return `${treeUrl(sheetUrl, name)}&view=${encodeURIComponent(view)}`;
+}
+
+/** Clicks the toolbar's "Export SVG" button and returns the downloaded file's text content. */
+export async function exportSvg(page: Page): Promise<string> {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Export SVG' }).click(),
+  ]);
+  const path = await download.path();
+  if (!path) throw new Error('download.path() returned null — was acceptDownloads disabled?');
+  return readFileSync(path, 'utf-8');
+}
+
 /** Migration shim for pre-dynamic specs: what `goto('/?family=alpha')` used to do. */
 export async function gotoSrc(page: Page, opts: { url?: string; name?: string } = {}) {
   await page.goto(treeUrl(opts.url ?? ALPHA_URL, opts.name ?? 'Alpha Family'));

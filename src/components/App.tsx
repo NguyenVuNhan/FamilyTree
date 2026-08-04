@@ -4,18 +4,26 @@ import { loadSaved, upsertSaved } from '../config/registry';
 import { resolveSource, type ResolvedSource } from '../config/source';
 import type { Issue } from '../data/types';
 import { layoutMetrics } from '../layout/card-metrics';
+import { flowLayout, printUnplacedIds } from '../layout/flow-layout';
 import { layoutTree, unplacedIds } from '../layout/layout-engine';
+import { buildExportSvg, collectFontCss, downloadSvg, exportFilename } from '../print/export';
+import { TITLE_BLOCK_MM, checkFit } from '../print/fit';
+import { formatSizeMm } from '../print/formats';
+import { THEMES } from '../print/themes';
 import { loadSettings, saveSettings, type LayoutSettings } from '../settings/settings';
 import { decodeView, encodeView } from '../settings/view-param';
 import { ErrorPanel } from './ErrorPanel';
 import { LoadFamilyDialog } from './LoadFamilyDialog';
 import { PanZoomViewport, type ViewportApi } from './PanZoomViewport';
+import { PrintSheet } from './PrintSheet';
+import { PrintTreeCanvas } from './PrintTreeCanvas';
 import { SampleDataBanner } from './SampleDataBanner';
 import { SettingsPanel } from './SettingsPanel';
 import { Toolbar } from './Toolbar';
 import { TreeCanvas } from './TreeCanvas';
 import { useFamilyData } from './use-family-data';
 import { useNameLines } from './use-name-lines';
+import { usePrintMeasure } from './use-print-measure';
 
 const LINK_ERROR_HINT = 'Check the link you were given, or ask the person who shared it for a new one.';
 
@@ -48,6 +56,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [scalePct, setScalePct] = useState(100);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const viewport = useRef<ViewportApi | null>(null);
 
   const changeSettings = (s: LayoutSettings) => {
@@ -106,6 +115,18 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     [data, settings, nameLines],
   );
 
+  const printMeasure = usePrintMeasure(settings.theme);
+  // Only the flow arrangement consumes the print scene — computing it in topDown
+  // would burn full-tree text measurement on every load for nothing (and its
+  // first-paint cost is what exposed E2E-16's snapshot race on slow CI runners).
+  const scene = useMemo(
+    () =>
+      data.status === 'ready' && settings.arrangement === 'flow'
+        ? flowLayout(data.model, printMeasure)
+        : null,
+    [data, printMeasure, settings.arrangement],
+  );
+
   // Never a silently wrong tree (spec §6): if the single-root layout walk couldn't
   // reach everyone in the model (e.g. a rendered child's spouse's own parents form a
   // second root-candidate union), surface it rather than dropping them without a trace.
@@ -118,7 +139,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
   }, [data, layout]);
 
   useEffect(() => {
-    if (!layout) return;
+    if (!layout || settings.arrangement !== 'topDown') return;
     const onBeforePrint = () => {
       document.documentElement.style.setProperty(
         '--print-scale', String(Math.min(1, 1000 / layout.width, 660 / layout.height)),
@@ -126,7 +147,14 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     };
     window.addEventListener('beforeprint', onBeforePrint);
     return () => window.removeEventListener('beforeprint', onBeforePrint);
-  }, [layout]);
+  }, [layout, settings.arrangement]);
+
+  // CSS (index.css) keys the print-only sheet visibility off body[data-print-arrangement].
+  useEffect(() => {
+    if (settings.arrangement !== 'flow') return;
+    document.body.dataset.printArrangement = 'flow';
+    return () => { delete document.body.dataset.printArrangement; };
+  }, [settings.arrangement]);
 
   if (data.status === 'loading') return <main className="center-screen" data-testid="loading"><div className="spinner" aria-label="Loading" /></main>;
   if (data.status === 'invalid') return <main className="center-screen"><ErrorPanel errors={data.errors} /></main>;
@@ -140,6 +168,41 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     );
   }
 
+  const isFlow = settings.arrangement === 'flow';
+  const theme = THEMES[settings.theme];
+  const size = formatSizeMm(settings);
+  const fit = scene ? checkFit(scene.wMm, scene.hMm + TITLE_BLOCK_MM, size, settings.marginMm) : { ok: true as const };
+  // Blocked-export precedence (UC-19/82/89): excluded (disconnected-component) people
+  // first — never a silently dropped ancestor in an exported/printed tree — then
+  // unplaced people, then fit refusal, else export is enabled. Every reason names
+  // people by display name (excludedNames/fullName), never the synthetic r5/r5p ids.
+  const unplacedNames = scene
+    ? printUnplacedIds(data.model, scene).map((id) => data.model.persons.get(id)!.fullName)
+    : [];
+  const exportDisabledReason: string | null = data.model.excludedIds.length > 0
+    ? `Cannot export while people are not connected to the main family: ${data.model.excludedNames.join(', ')}`
+    : unplacedNames.length > 0
+      ? `Cannot export while people are missing from the tree: ${unplacedNames.join(', ')}`
+      : !fit.ok ? fit.message : null;
+  const guide = settings.frameGuide ? { wMm: size.wMm, hMm: size.hMm, marginMm: settings.marginMm } : null;
+  const handleExport = () => {
+    setExportError(null);
+    collectFontCss(theme).then((fontCss) =>
+      downloadSvg(
+        buildExportSvg(document.querySelector('.print-canvas-svg')!, {
+          wMm: size.wMm, hMm: size.hMm, fontCss, background: theme.background,
+        }),
+        exportFilename(source.displayName, 'flow', settings.theme, size.wMm, size.hMm),
+      ),
+    ).catch((err: unknown) => {
+      // Offline / a 404'd font asset must never be a silent no-op click or an
+      // unhandled rejection — surface it the same way fit/unplaced refusals are shown.
+      console.error('Export failed', err);
+      setExportError('Export failed — check your connection and retry.');
+    });
+  };
+  const toggleExpanded = (id: string) => setExpandedId((cur) => (cur === id ? null : id));
+
   return (
     <div className="app">
       <Toolbar
@@ -152,6 +215,8 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         onPrint={() => window.print()}
         settingsOpen={panelOpen}
         onToggleSettings={() => setPanelOpen((o) => !o)}
+        onExport={isFlow ? handleExport : undefined}
+        exportDisabledReason={isFlow ? exportDisabledReason : undefined}
       />
       {panelOpen && <SettingsPanel settings={settings} onChange={changeSettings} />}
       {source.kind === 'demo' && !bannerDismissed && (
@@ -162,15 +227,38 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
           {warnings.map((w, i) => <p key={i}>{w.message}</p>)}
         </div>
       )}
+      {isFlow && !fit.ok && (
+        // Blocks export only (see exportDisabledReason above) — print (window.print())
+        // and the canvas itself keep working regardless, per spec: a fit failure never
+        // hides the tree or the ability to print it.
+        <div className="warnings" data-testid="fit-refusal">{fit.message}</div>
+      )}
+      {isFlow && exportError && (
+        <div className="warnings" data-testid="export-error">{exportError}</div>
+      )}
       <PanZoomViewport
-        contentSize={{ width: layout!.width, height: layout!.height }}
+        contentSize={isFlow && scene
+          ? { width: scene.wMm, height: scene.hMm + TITLE_BLOCK_MM }
+          : { width: layout!.width, height: layout!.height }}
         onBackgroundClick={() => { setExpandedId(null); setPanelOpen(false); }}
         viewportRef={viewport}
         onScaleChange={setScalePct}
       >
-        <TreeCanvas model={data.model} layout={layout!} settings={settings} nameLines={nameLines}
-          expandedId={expandedId} onToggle={(id) => setExpandedId((cur) => (cur === id ? null : id))} />
+        {isFlow && scene ? (
+          <PrintTreeCanvas scene={scene} theme={theme} title={source.displayName}
+            guide={guide} expandedId={expandedId} onToggle={toggleExpanded} />
+        ) : (
+          <TreeCanvas model={data.model} layout={layout!} settings={settings} nameLines={nameLines}
+            expandedId={expandedId} onToggle={toggleExpanded} />
+        )}
       </PanZoomViewport>
+      {isFlow && (
+        // The @page rule this injects (id="print-page") beats index.css's unscoped
+        // @page{size:landscape} purely by head insertion order — same specificity,
+        // later wins — so PrintSheet must stay mounted after main.tsx's stylesheet import.
+        <PrintSheet svgSelector=".print-canvas-svg" wMm={size.wMm} hMm={size.hMm}
+          background={theme.background} />
+      )}
     </div>
   );
 }

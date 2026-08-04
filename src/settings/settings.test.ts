@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, loadSettings, sanitizeSettings, saveSettings, SPACING_BOUNDS } from './settings';
+import { DEFAULT_SETTINGS, loadSettings, printControlsActive, sanitizeSettings, saveSettings, SPACING_BOUNDS } from './settings';
 
 afterEach(() => localStorage.clear());
 
@@ -58,6 +58,31 @@ describe('load/save round-trip', () => {
       cardStyle: 'archCard', contentMode: 'full', namePosition: 'bottom',
       cardPadding: 14, coupleGap: 28, siblingGap: 36, genGap: 90,
       connectorStyle: 'elbow', placeholderStyle: 'initials',
+      arrangement: 'topDown', theme: 'indochine', format: 'pano',
+      customWmm: 1200, customHmm: 600, marginMm: 60, frameGuide: false,
     });
+  });
+});
+
+describe('print settings fields', () => {
+  it('defaults', () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({
+      arrangement: 'topDown', theme: 'indochine', format: 'pano',
+      customWmm: 1200, customHmm: 600, marginMm: 60, frameGuide: false,
+    });
+  });
+  it('sanitize: per-field fallback on junk', () => {
+    const s = sanitizeSettings({ arrangement: 'banana', theme: 'inkwash', format: 'b5', marginMm: 500, frameGuide: 'yes' });
+    expect(s).toMatchObject({
+      arrangement: 'topDown', theme: 'inkwash', format: 'pano', marginMm: 60, frameGuide: false,
+    });
+  });
+  it('sanitize: custom mm bounds (300 min side, 2000×1200 max)', () => {
+    expect(sanitizeSettings({ customWmm: 299 }).customWmm).toBe(1200);
+    expect(sanitizeSettings({ customWmm: 2000, customHmm: 1200 })).toMatchObject({ customWmm: 2000, customHmm: 1200 });
+  });
+  it('printControlsActive', () => {
+    expect(printControlsActive(DEFAULT_SETTINGS)).toBe(false);
+    expect(printControlsActive({ ...DEFAULT_SETTINGS, arrangement: 'flow' })).toBe(true);
   });
 });
