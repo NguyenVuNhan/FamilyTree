@@ -45,6 +45,15 @@ export interface PanelPlan {
   model: FamilyModel;
   /** Labels of the out-chips inside this panel, in cut (left→right) order. */
   cutLabels: string[];
+  /** True when narrowing already bottomed out at F0–F1 (W=1) and the panel's
+   *  rendered occupancy still exceeds PANEL_SOFT_CAP — every gen-1 branch is
+   *  individually below MAJOR_BRANCH_MIN, so none of them can be cut and the
+   *  tiny-branch fallback (D1) renders the whole thing regardless of window.
+   *  Cutting semantics are unchanged; this only surfaces the condition so a
+   *  downstream consumer (checkFit/checkPanelsFit) can turn it into an honest
+   *  refusal instead of silently emitting an unbounded panel. Always false
+   *  for the lone-person ('p:') case and whenever narrowing wasn't needed. */
+  overCap: boolean;
 }
 
 export function partitionPanels(model: FamilyModel): PanelPlan[] {
@@ -71,7 +80,7 @@ export function partitionPanels(model: FamilyModel): PanelPlan[] {
       // lone-root master: one panel, no cuts
       const persons = new Map<string, Person>([[node.personId, model.persons.get(node.personId)!]]);
       plans.push({
-        label, parentLabel, rootId: `p:${node.personId}`, headId: null, cutLabels: [],
+        label, parentLabel, rootId: `p:${node.personId}`, headId: null, cutLabels: [], overCap: false,
         model: { persons, unions: [], rootId: `p:${node.personId}`, excludedIds: [], excludedNames: [] },
       });
       continue;
@@ -88,6 +97,12 @@ export function partitionPanels(model: FamilyModel): PanelPlan[] {
     };
     // D2 — soft-cap hub narrowing: F0–F2 by default, F0–F1 when the window is too crowded.
     const W = renderedCount(node, 0, PANEL_WINDOW_GENS) <= PANEL_SOFT_CAP ? PANEL_WINDOW_GENS : 1;
+    // D2 follow-up: narrowing to F0–F1 is a no-op when every gen-1 branch is
+    // individually below MAJOR_BRANCH_MIN — none of them can be cut, so the
+    // tiny-branch fallback (D1) renders each one in full regardless of W, and
+    // the panel stays as large as the whole subtree. Surface that instead of
+    // silently emitting an unbounded panel.
+    const overCap = W === 1 && renderedCount(node, 0, 1) > PANEL_SOFT_CAP;
 
     const persons = new Map<string, Person>();
     const unions: Union[] = [];
@@ -131,6 +146,7 @@ export function partitionPanels(model: FamilyModel): PanelPlan[] {
       rootId: node.union.id,
       headId: label === null ? null : node.union.partners[0],
       cutLabels,
+      overCap,
       model: { persons, unions, rootId: node.union.id, excludedIds: [], excludedNames: [] },
     });
   }
