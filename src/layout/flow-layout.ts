@@ -44,7 +44,9 @@ export interface PrintScene {
 }
 export type PrintMeasurer = (text: string, fontMm: number, titleFace: boolean) => number;
 
-export type TreeNode = { kind: 'union'; union: Union; children: TreeNode[] } | { kind: 'person'; personId: string };
+export type TreeNode =
+  | { kind: 'union'; union: Union; /** parent union's childId that reached this union; null at the root */ linkId: string | null; children: TreeNode[] }
+  | { kind: 'person'; personId: string };
 
 /** Union-walk tree shared by the print engines (flow, fan): each union renders
  *  once (first branch to reach it wins — cousin-marriage dedup, mirrors
@@ -57,11 +59,11 @@ export function buildPrintTree(model: FamilyModel): TreeNode {
     const u = unionOfPartner.get(personId);
     if (!u) return { kind: 'person', personId };
     if (visited.has(u.id)) return null;
-    return unionNode(u);
+    return unionNode(u, personId);                                        // ← pass the link id
   };
-  const unionNode = (u: Union): TreeNode => {
+  const unionNode = (u: Union, linkId: string | null = null): TreeNode => {  // ← new param
     visited.add(u.id);
-    return { kind: 'union', union: u, children: u.childIds.map(toNode).filter((n): n is TreeNode => n !== null) };
+    return { kind: 'union', union: u, linkId, children: u.childIds.map(toNode).filter((n): n is TreeNode => n !== null) };
   };
   return model.rootId.startsWith('p:')
     ? { kind: 'person', personId: model.rootId.slice(2) }

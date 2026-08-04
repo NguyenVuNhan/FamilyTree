@@ -304,4 +304,26 @@ describe('shared print-tree primitives (PR ② prep)', () => {
     const scene = flowLayout(couple([{ id: 'c1' }]), measure);
     for (const n of scene.nodes) expect(n.rotateDeg).toBeUndefined();
   });
+
+  it('union nodes carry the linkId that reached them (PR ③ partitioner contract)', () => {
+    // root couple a+b, child c1 who married c1w and had g1
+    const persons = new Map<string, Person>();
+    for (const id of ['a', 'b', 'c1', 'c1w', 'g1']) persons.set(id, { id, fullName: id, cleanName: id });
+    const m: FamilyModel = {
+      persons,
+      unions: [
+        { id: 'u:a+b', partners: ['a', 'b'], childIds: ['c1'] },
+        { id: 'u:c1+c1w', partners: ['c1', 'c1w'], childIds: ['g1'] },
+      ],
+      rootId: 'u:a+b', excludedIds: [], excludedNames: [],
+    };
+    const tree = buildPrintTree(m);
+    expect(tree.kind).toBe('union');
+    if (tree.kind === 'union') {
+      expect(tree.linkId).toBeNull();
+      const child = tree.children[0];
+      expect(child.kind).toBe('union');
+      if (child.kind === 'union') expect(child.linkId).toBe('c1');
+    }
+  });
 });
