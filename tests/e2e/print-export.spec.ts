@@ -3,24 +3,25 @@ import { expect, test } from '@playwright/test';
 import { parseDims } from './helpers/svg-mm';
 import { exportSvg, FIXTURE_SERVER, viewUrl } from './helpers';
 
-const WORST = `${FIXTURE_SERVER}/stair-worst-200.csv`;
+// stair-worst-200.csv is deliberately unfittable at every format the app supports (see
+// worst-case-generator.ts's generateDense() doc comment) — this test needs an actual
+// export, so it runs against stair-dense-35.csv instead (same generator/seed, a shape
+// sized to fit panorama at a 60mm margin).
+const DENSE = `${FIXTURE_SERVER}/stair-dense-35.csv`;
 const DISCONNECTED = `${FIXTURE_SERVER}/disconnected.csv`;
 
-// KNOWN APP GAP (same one documented in print-prepress.spec.ts) — stair-worst-200.csv's
-// flow layout needs ~2756mm of content height, which exceeds even the largest custom
-// format (PRINT_BOUNDS.customMm.maxH = 1200mm) by ~2.3x at the app's minimum margin.
-// "Export SVG" is therefore permanently disabled for this fixture at pano (and at every
-// other format), so exportSvg() would hang waiting for a 'download' event that never
-// fires. Body kept exactly to the task-17-brief.md contract, ready to re-enable once
-// flow-layout.ts's leaf-run wrap is generalized to nested (not just flat) leaf branches.
-test.fixme('E2E-58: export is deterministic, offline-safe, and mm-calibrated (UC-83, UC-96)', async ({ page }) => {
-  await page.goto(viewUrl(WORST, 'arr:flow,fmt:pano', 'W'));
+test('E2E-66: export is deterministic, offline-safe, and mm-calibrated (UC-83, UC-96)', async ({ page }) => {
+  await page.goto(viewUrl(DENSE, 'arr:flow,fmt:pano', 'W'));
   await expect(page.locator('g.person-node').first()).toBeVisible();
   const first = await exportSvg(page);
   const second = await exportSvg(page);
   expect(second).toBe(first); // byte-identical: no timestamps, no randomness
 
-  expect(first).not.toMatch(/https?:\/\//); // fully self-contained — no network refetch on open
+  // fully self-contained — no network refetch on open. Every <svg> legitimately declares
+  // xmlns="http://www.w3.org/2000/svg" (and buildExportSvg's doc.implementation.createDocument
+  // sets it too), so strip xmlns attributes before checking for a live http(s) reference
+  // rather than a false positive on the XML namespace URI itself.
+  expect(first.replace(/\bxmlns(:\w+)?="[^"]*"/g, '')).not.toMatch(/https?:\/\//);
   expect(first).toContain('data:font/woff2;base64,'); // fonts embedded, not linked
   expect(first).toContain('h 100'); // the calibration bar's 100mm reference segment
 
@@ -31,7 +32,7 @@ test.fixme('E2E-58: export is deterministic, offline-safe, and mm-calibrated (UC
   expect(viewBox[2] / viewBox[3]).toBeCloseTo(wMm / hMm, 5);
 });
 
-test('E2E-59: a disconnected component is excluded, named, and never blocks its own family (UC-19, UC-89)', async ({ page }) => {
+test('E2E-67: a disconnected component is excluded, named, and blocks export (UC-19, UC-89)', async ({ page }) => {
   await page.goto(viewUrl(DISCONNECTED, 'arr:flow', 'Disc'));
   await expect(page.locator('g.person-node').first()).toBeVisible();
   await expect(page.locator('g.person-node')).toHaveCount(5); // Margaret/Robert/David/Sarah/Linda
@@ -42,15 +43,13 @@ test('E2E-59: a disconnected component is excluded, named, and never blocks its 
   const noticeText = (await notice.textContent())!;
   expect(noticeText).not.toMatch(/\br\d+p?\b/); // display names only, never synthetic row ids
 
-  // Adaptation from the brief: per App.tsx's blocked-export precedence (unplaced-via-
-  // inlaw people, then fit refusal, else enabled — settled and reviewed in Task 15,
-  // task-17-brief.md line ~19 for task-15), a smaller *disconnected* component that's
-  // cleanly excluded from the model does NOT block export — only people the layout
-  // walk failed to place despite being IN the rendered model, or a fit refusal, do.
-  // disconnected.csv's excluded pair (Lost One/Lost Two) fits neither case, and the
-  // 5-person main component fits comfortably at the default pano format, so Export SVG
-  // is (correctly, by that precedence) enabled here — verified against the live app
-  // rather than assuming the brief's one-line gloss. See task-17-report.md for the
-  // full repro this was checked against.
-  await expect(page.getByRole('button', { name: 'Export SVG' })).toBeEnabled();
+  // A silently dropped ancestor is never acceptable in an exported/printed tree (spec
+  // rule, UC-19) — App.tsx's blocked-export precedence checks excludedIds first, before
+  // unplaced-via-inlaw people or a fit refusal, naming excluded people by display name.
+  const exportButton = page.getByRole('button', { name: 'Export SVG' });
+  await expect(exportButton).toBeDisabled();
+  const reason = (await exportButton.getAttribute('title')) ?? '';
+  expect(reason).toContain('Lost One');
+  expect(reason).toContain('Lost Two');
+  expect(reason).not.toMatch(/\br\d+p?\b/);
 });

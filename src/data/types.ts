@@ -37,4 +37,5 @@ export interface FamilyModel {
   unions: Union[];
   rootId: string;           // union id (couple root) or person id prefixed 'p:' for a lone root
   excludedIds: string[];    // people in smaller disconnected components (not rendered)
+  excludedNames: string[];  // display names for excludedIds, same order — never synthesize from ids
 }

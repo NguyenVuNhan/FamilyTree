@@ -261,6 +261,20 @@ describe('flow arrangement (UC-77/82/89)', () => {
     expect(await screen.findByTestId('fit-refusal')).toHaveTextContent('cm');
   });
 
+  it('excluded (disconnected-component) people block export, named by display name (UC-19)', async () => {
+    csvFetch('Image,Gen 1,Gen 2\n,Ông Nội + Bà Nội,\n,,Con Trai\n,Người Lạc + Người Lạc Hai,');
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:flow')}`);
+    render(<App />);
+    await screen.findAllByRole('button', { name: /Ông/ });
+    const exportButton = screen.getByRole('button', { name: 'Export SVG' });
+    expect(exportButton).toBeDisabled();
+    const reason = exportButton.getAttribute('title') ?? '';
+    expect(reason).toContain('Người Lạc');
+    expect(reason).not.toMatch(/\br\d+p?\b/); // never a synthetic row id
+    // Also surfaced in the "not connected" warning, by the same names.
+    expect(screen.getByTestId('warnings')).toHaveTextContent('Người Lạc');
+  });
+
   it('export failure surfaces a message instead of a silent no-op / unhandled rejection', async () => {
     vi.mocked(collectFontCss).mockRejectedValueOnce(new Error('offline'));
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});

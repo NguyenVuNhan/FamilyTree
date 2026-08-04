@@ -13,7 +13,7 @@ function couple(children: Array<{ id: string; name?: string }>): FamilyModel {
     persons,
     unions: [{ id: 'u:a+b', partners: ['a', 'b'], childIds: children.map((c) => c.id) }],
     rootId: 'u:a+b',
-    excludedIds: [],
+    excludedIds: [], excludedNames: [],
   };
 }
 
@@ -80,7 +80,7 @@ describe('font tiers (legibility-floor-first, spec §Error handling 2)', () => {
         { id: 'u4', partners: ['p4a', 'p4b'], childIds: ['p5'] },
       ],
       rootId: 'u0',
-      excludedIds: [],
+      excludedIds: [], excludedNames: [],
     };
     const scene = flowLayout(model, measure);
     const at = (id: string) => scene.nodes.find((n) => n.personId === id)!;
@@ -142,7 +142,7 @@ describe('flowLayout', () => {
       persons,
       unions: [{ id: 'u:a+b', partners: ['a', 'b'], childIds: Array.from({ length: 8 }, (_, i) => `k${i}`) }],
       rootId: 'u:a+b',
-      excludedIds: [],
+      excludedIds: [], excludedNames: [],
     };
     const scene = flowLayout(model, measure);
     for (const n of scene.nodes) {
@@ -171,7 +171,7 @@ describe('flowLayout', () => {
         { id: 'u:g1+g2', partners: ['g1', 'g2'], childIds: ['gc'] },
       ],
       rootId: 'u:x+y',
-      excludedIds: [],
+      excludedIds: [], excludedNames: [],
     };
     assertNoOverlaps(flowLayout(model, measure));
   });
@@ -190,7 +190,7 @@ describe('flowLayout', () => {
       persons,
       unions: [{ id: 'u:a+b', partners: ['a', 'b'], childIds: Array.from({ length: 8 }, (_, i) => `k${i}`) }],
       rootId: 'u:a+b',
-      excludedIds: [],
+      excludedIds: [], excludedNames: [],
     };
     const scene = flowLayout(model, measure);
     const boxOf = (id: string) => {
@@ -212,7 +212,7 @@ describe('flowLayout', () => {
   it("a 'p:' lone-root model places exactly one node and zero edges", () => {
     const persons = new Map<string, Person>();
     persons.set('solo', { id: 'solo', fullName: 'Solo', cleanName: 'Solo' });
-    const model: FamilyModel = { persons, unions: [], rootId: 'p:solo', excludedIds: [] };
+    const model: FamilyModel = { persons, unions: [], rootId: 'p:solo', excludedIds: [], excludedNames: [] };
     const scene = flowLayout(model, measure);
     expect(scene.nodes).toHaveLength(1);
     expect(scene.nodes[0].personId).toBe('solo');
@@ -238,7 +238,7 @@ describe('flowLayout', () => {
         { id: 'u:mn', partners: ['m', 'n'], childIds: ['z'] },
       ],
       rootId: 'u:root',
-      excludedIds: [],
+      excludedIds: [], excludedNames: [],
     };
     const scene = flowLayout(model, measure);
     expect(scene.nodes.map((n) => n.personId).sort()).toEqual(

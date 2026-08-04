@@ -20,11 +20,11 @@ function process(text: string): DataState {
   const warnings = [...parseWarnings, ...imageWarnings];
   const model = buildModel(rows);
   if (model.excludedIds.length > 0) {
-    // synthetic ids (r5, r5p) must never reach the user — list display names
-    const nameOf = new Map(rows.map((r) => [r.id, r.fullName]));
-    warnings.push({
-      message: `Not connected to the main family and not shown: ${model.excludedIds.map((id) => nameOf.get(id) ?? id).join(', ')}`,
-    });
+    // synthetic ids (r5, r5p) must never reach the user — model.excludedNames already
+    // carries display names in the same order (captured in build-model.ts before it
+    // deletes these people from `persons`) — the same names App.tsx's export-block
+    // reason uses, so there's one source of truth instead of two name lookups.
+    warnings.push({ message: `Not connected to the main family and not shown: ${model.excludedNames.join(', ')}` });
   }
   return { status: 'ready', model, warnings };
 }

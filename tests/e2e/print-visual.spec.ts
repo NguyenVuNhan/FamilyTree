@@ -37,7 +37,7 @@ test('E2E-30: print visual regression (UC-4) — local guard, CI ignores snapsho
   await expect(page).toHaveScreenshot('tree-standard-print.png', { maxDiffPixelRatio: 0.02 });
 });
 
-test('E2E-67: print media renders the flow print-sheet at physical size (UC-83) — local guard, CI ignores snapshots', async ({ page }) => {
+test('E2E-75: print media renders the flow print-sheet at physical size (UC-83) — local guard, CI ignores snapshots', async ({ page }) => {
   await page.route('https://img.example/**', (r) => r.abort());
   await page.goto(viewUrl(STANDARD, 'arr:flow', 'Std'));
   await expect(page.locator('g.person-node').first()).toBeVisible();
@@ -63,7 +63,7 @@ test('E2E-67: print media renders the flow print-sheet at physical size (UC-83) 
 
 const FLOW_THEMES = ['indochine', 'nordic', 'inkwash', 'botanical'] as const;
 for (const theme of FLOW_THEMES) {
-  test(`E2E-71: flow visual regression — ${theme} theme (UC-76) — local guard, CI ignores snapshots`, async ({ page }) => {
+  test(`E2E-79: flow visual regression — ${theme} theme (UC-76) — local guard, CI ignores snapshots`, async ({ page }) => {
     await page.route('https://img.example/**', (r) => r.abort());
     await page.goto(viewUrl(STANDARD, `arr:flow,theme:${theme}`, 'Std'));
     await expect(page.locator('g.person-node').first()).toBeVisible();

@@ -4,7 +4,7 @@ import { FIXTURE_SERVER, treeUrl } from './helpers';
 
 const SRC_URL = `${FIXTURE_SERVER}/standard.csv`;
 
-test('E2E-68: a print view link round-trips arrangement/theme/margin and survives a post-load tweak (UC-76, UC-78, UC-89)', async ({
+test('E2E-76: a print view link round-trips arrangement/theme/margin and survives a post-load tweak (UC-76, UC-78, UC-89)', async ({
   page, context, browser,
 }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -63,7 +63,7 @@ test('E2E-68: a print view link round-trips arrangement/theme/margin and survive
 
 const BLANK_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
-test('E2E-69: a garbage view value degrades to defaults silently — no error panel, no console errors (UC-81)', async ({ page }) => {
+test('E2E-77: a garbage view value degrades to defaults silently — no error panel, no console errors (UC-81)', async ({ page }) => {
   // standard.csv's avatar URL is fake (img.example) — abort()/a real DNS failure both log
   // their own "Failed to load resource" console error, which would be unrelated noise
   // against what this test actually checks (bad ?view= handling). Fulfilling with a real
@@ -82,7 +82,7 @@ test('E2E-69: a garbage view value degrades to defaults silently — no error pa
   expect(errors).toEqual([]);
 });
 
-test('E2E-70: registry entries never carry ?view=, and the demo family accepts a print view link too (UC-78, UC-82)', async ({ page }) => {
+test('E2E-78: registry entries never carry ?view=, and the demo family accepts a print view link too (UC-78, UC-82)', async ({ page }) => {
   await page.goto(treeUrl(SRC_URL, 'RegTest'));
   await expect(page.locator('.person-card').first()).toBeVisible();
   await page.goto(`${treeUrl(SRC_URL, 'RegTest')}&view=${encodeURIComponent('arr:flow,theme:nordic')}`);

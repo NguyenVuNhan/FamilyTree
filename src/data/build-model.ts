@@ -89,6 +89,10 @@ export function buildModel(rows: PersonRow[]): FamilyModel {
   }
 
   const excludedIds = [...persons.keys()].filter((id) => componentOf.get(id) !== keep).sort();
+  // Captured before deletion below — excludedIds' Person entries won't exist in `persons`
+  // afterward, and callers (the export-block reason, the "not connected" warning) must
+  // never fall back to showing a synthetic r<n> id in their place.
+  const excludedNames = excludedIds.map((id) => persons.get(id)!.fullName);
   for (const id of excludedIds) persons.delete(id);
   const keptUnions = [...unions.values()].filter((u) => persons.has(u.partners[0]));
 
@@ -97,5 +101,5 @@ export function buildModel(rows: PersonRow[]): FamilyModel {
   const rootUnion = keptUnions.find((u) => u.partners.every((p) => !isChild.has(p)));
   const rootId = rootUnion ? rootUnion.id : `p:${[...persons.keys()][0] ?? ''}`;
 
-  return { persons, unions: keptUnions, rootId, excludedIds };
+  return { persons, unions: keptUnions, rootId, excludedIds, excludedNames };
 }

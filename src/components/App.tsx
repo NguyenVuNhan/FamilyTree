@@ -166,14 +166,18 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
   const theme = THEMES[settings.theme];
   const size = formatSizeMm(settings);
   const fit = scene ? checkFit(scene.wMm, scene.hMm + TITLE_BLOCK_MM, size, settings.marginMm) : { ok: true as const };
-  // Blocked-export precedence (UC-82/89): unplaced people first (display names,
-  // never the synthetic r5/r5p ids), then fit refusal, else export is enabled.
+  // Blocked-export precedence (UC-19/82/89): excluded (disconnected-component) people
+  // first — never a silently dropped ancestor in an exported/printed tree — then
+  // unplaced people, then fit refusal, else export is enabled. Every reason names
+  // people by display name (excludedNames/fullName), never the synthetic r5/r5p ids.
   const unplacedNames = scene
     ? printUnplacedIds(data.model, scene).map((id) => data.model.persons.get(id)!.fullName)
     : [];
-  const exportDisabledReason: string | null = unplacedNames.length > 0
-    ? `Cannot export while people are missing from the tree: ${unplacedNames.join(', ')}`
-    : !fit.ok ? fit.message : null;
+  const exportDisabledReason: string | null = data.model.excludedIds.length > 0
+    ? `Cannot export while people are not connected to the main family: ${data.model.excludedNames.join(', ')}`
+    : unplacedNames.length > 0
+      ? `Cannot export while people are missing from the tree: ${unplacedNames.join(', ')}`
+      : !fit.ok ? fit.message : null;
   const guide = settings.frameGuide ? { wMm: size.wMm, hMm: size.hMm, marginMm: settings.marginMm } : null;
   const handleExport = () => {
     setExportError(null);

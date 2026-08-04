@@ -31,7 +31,6 @@
 //      deeper) row still on the stack.
 const GIVEN = ['Thị Phương Thảo', 'Văn Đức', 'Thị Kim Cúc', 'Hoàng Bảo Ngọc', 'Thị Quỳnh Anh', 'Văn Trường', 'Thị Hồng Gấm', 'Ngọc Trâm Anh', 'Văn Hiệp', 'Thị Bích Ngọc'];
 const FAMILY = ['Nguyễn', 'Trần', 'Lê', 'Phạm', 'Võ', 'Ngô'];
-const TARGET = 200;
 
 export function mulberry32(seed: number): () => number {
   let a = seed;
@@ -43,7 +42,13 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-export function generateWorstCase(): string {
+/** `target` defaults to 200 (the deliberately unfittable stress fixture — see
+ *  stair-worst-200.csv's own header comment for why that one is never meant to
+ *  export). Passing a smaller `target` (same seed, same skew/degenerate-shape
+ *  mix, just less of the dense branch) produces a fixture that CAN actually be
+ *  exported — see generateDense()/stair-dense-*.csv. */
+export function generateWorstCase(target = 200): string {
+  const TARGET = target;
   const rnd = mulberry32(20260803);
   const pick = <T,>(arr: readonly T[]) => arr[Math.floor(rnd() * arr.length)];
   let year = 1900;
@@ -61,6 +66,14 @@ export function generateWorstCase(): string {
 
   const lines: string[] = ['Image,Gen 1,Gen 2,Gen 3,Gen 4,Gen 5'];
   let count = 0;
+  // Tracks the depth of the most recently emitted row, so the top-up loop
+  // below can attach at a depth the parser's stack actually supports instead
+  // of a hardcoded 4 — at TARGET=200 the dense loop always reaches gen-5
+  // (depth 4) before its budget runs out, but at a much smaller TARGET the
+  // dense loop can exhaust the budget after only a gen-3 (or gen-4) row,
+  // and an unconditional depth-4 top-up would then be a depth jump the
+  // parser rejects (surfaced while tuning stair-dense-*.csv).
+  let lastDepth = 0;
   // Every call site checks affordability against TARGET before calling
   // row(), so `count` always equals the true number of PersonRow objects
   // the parser will produce from `lines` — the guard test's byte/row-count
@@ -68,6 +81,7 @@ export function generateWorstCase(): string {
   const row = (depth: number, cell: string, people: number) => {
     lines.push(',' + ','.repeat(depth) + `"${cell}"` + ','.repeat(4 - depth));
     count += people;
+    lastDepth = depth;
   };
 
   // Exactly one gen-1 root couple (a second root would fragment the tree
@@ -119,10 +133,70 @@ export function generateWorstCase(): string {
     }
   }
 
-  // Top up to exactly TARGET under the last gen-4 (or deeper) couple still
-  // on the stack — each addition is a single person, so this can never
-  // overshoot.
-  while (count < TARGET) row(4, person(), 1);
+  // Top up to exactly TARGET as siblings under whatever the dense loop last
+  // established (one level deeper than `lastDepth`, capped at gen-5) — each
+  // addition is a single person, so this can never overshoot the target,
+  // and reusing the same depth for every top-up row keeps them all siblings
+  // under that same parent (see `lastDepth` comment above).
+  const topUpDepth = Math.min(4, lastDepth + 1);
+  while (count < TARGET) row(topUpDepth, person(), 1);
+
+  return lines.join('\n') + '\n';
+}
+
+/** A *structurally different* shape from generateWorstCase, not just a smaller
+ *  `target` on the same one — empirically, generateWorstCase's fixed skeleton
+ *  (its two ~31-person smallBranch()es alone) already renders at ~725mm tall,
+ *  well past what even panorama (1200×600mm) at a 60mm margin can hold
+ *  (~480mm of content height), regardless of how small `target` is. Every
+ *  union in that skeleton has ≤3 direct children, so flow-layout's leaf-run
+ *  wrap (only kicks in for a union with >6 direct, non-nested leaf children)
+ *  never engages anywhere in it.
+ *
+ *  generateDense() is built the opposite way on purpose: a short spine down
+ *  to one single-partner "union" that fans out into `target` DIRECT leaf
+ *  children — the one shape leaf-run actually compacts (into 2 mini-columns,
+ *  ceil(n/2) rows instead of n). Even so, at the floor-adjacent font sizes
+ *  flow-layout uses this deep, the 2× compaction still caps out well under
+ *  100 people for panorama+60mm — see stair-dense-*.csv's header for the
+ *  exact measured ceiling this file's `target` was picked against. */
+export function generateDense(target: number): string {
+  const rnd = mulberry32(20260803);
+  const pick = <T,>(arr: readonly T[]) => arr[Math.floor(rnd() * arr.length)];
+  let year = 1900;
+  const person = (long = false): string => {
+    const name = long
+      ? `${pick(FAMILY)} ${pick(GIVEN)} ${pick(GIVEN)}`
+      : `${pick(FAMILY)} ${pick(GIVEN)}`;
+    const r = rnd();
+    year = Math.min(1995, year + Math.floor(rnd() * 3));
+    if (r < 0.4) return `${name} (${year}–${year + 60})`;
+    if (r < 0.6) return `${name} (${year})`;
+    if (r < 0.7) return `${name} (–${year + 60})`;
+    return name;
+  };
+
+  const lines: string[] = ['Image,Gen 1,Gen 2,Gen 3,Gen 4,Gen 5'];
+  const row = (depth: number, cell: string) => lines.push(',' + ','.repeat(depth) + `"${cell}"` + ','.repeat(4 - depth));
+
+  row(0, `${person()} + ${person()}`); // gen-1 root couple
+
+  // A tiny side branch preserving the "partnerless row with descendants"
+  // degenerate shape (the trailing " –" separator) — cheap in height (2
+  // people, no fan-out) so it doesn't compete with the dense branch's budget.
+  row(1, `${person()} –`);
+  row(2, person());
+  lines.push(',,,,,'); // spacing row
+
+  // The dense/skewed branch: a couple, then a single-partner spine person
+  // whose `target` direct children (the leaf-run-eligible fan) carry almost
+  // all of this fixture's people — the "skew" generateWorstCase's dense
+  // branch also has, just shallow enough to actually fit.
+  row(1, `${person()} + ${person()}`); // gen-2 dense head couple
+  row(2, person()); // gen-3 spine single — parent of the fan
+  for (let i = 0; i < target; i++) {
+    row(3, person(i < 5)); // first 5 get a long, fully-diacritic name
+  }
 
   return lines.join('\n') + '\n';
 }

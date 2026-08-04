@@ -1,8 +1,8 @@
 // tests/e2e/helpers/svg-mm.ts
 // mm-geometry assertion helpers for print-export SVG markup. `parseDims` is pure
-// string/regex work in Node; the rest need real SVG layout (getBBox/getCTM/
-// getPointAtLength), so each loads the exported markup into a throwaway page via
-// `page.setContent` and evaluates once.
+// string/regex work in Node; the rest need real SVG layout (getBBox/getPointAtLength),
+// so each loads the exported markup into a throwaway page via `page.setContent` and
+// evaluates once.
 import type { Page } from '@playwright/test';
 
 export interface SvgDims {
@@ -57,6 +57,30 @@ const SETUP = (svg: string) => `<!doctype html><html><body>${svg}</body></html>`
 export async function contentBBox(page: Page, svg: string): Promise<{ x: number; y: number; width: number; height: number }> {
   await page.setContent(SETUP(svg));
   return page.evaluate(() => {
+    // An element's absolute position needs to land in the root <svg>'s OWN coordinate
+    // system (viewBox units, i.e. mm-equivalent per parseDims's mmPerUnit) — NOT
+    // `getCTM()`/`getScreenCTM()`, which resolve into the root's established *viewport*
+    // space. Because this app's exports set width/height to physical "mm" values, that
+    // viewport space is actual CSS px (1 viewBox unit ≈ 3.78px at 96dpi), not viewBox
+    // units — confirmed empirically (getCTM-based coordinates came back ~3.78x too large
+    // on a 1200x600mm export). PrintTreeCanvas/buildExportSvg only ever nest plain
+    // `translate(x y)` transforms (no scale/rotate), so summing each ancestor's
+    // consolidated translate up to (not including) `root` is an exact, CTM-free fix.
+    const localOffset = (root: SVGSVGElement, el: Element): { x: number; y: number } => {
+      let x = 0;
+      let y = 0;
+      let node: Element | null = el;
+      while (node && node !== root) {
+        const consolidated = (node as unknown as SVGGraphicsElement).transform?.baseVal?.consolidate();
+        if (consolidated) {
+          x += consolidated.matrix.e;
+          y += consolidated.matrix.f;
+        }
+        node = node.parentElement;
+      }
+      return { x, y };
+    };
+
     const root = document.querySelector('svg');
     if (!root) throw new Error('contentBBox: no <svg> in the provided markup');
     let minX = Infinity;
@@ -74,24 +98,13 @@ export async function contentBBox(page: Page, svg: string): Promise<{ x: number;
         continue;
       }
       if (bbox.width === 0 && bbox.height === 0) continue;
-      const ctm = g.getCTM();
-      if (!ctm) continue;
-      const corners = [
-        [bbox.x, bbox.y],
-        [bbox.x + bbox.width, bbox.y],
-        [bbox.x, bbox.y + bbox.height],
-        [bbox.x + bbox.width, bbox.y + bbox.height],
-      ];
-      for (const [x, y] of corners) {
-        const pt = root.createSVGPoint();
-        pt.x = x;
-        pt.y = y;
-        const p = pt.matrixTransform(ctm);
-        minX = Math.min(minX, p.x);
-        minY = Math.min(minY, p.y);
-        maxX = Math.max(maxX, p.x);
-        maxY = Math.max(maxY, p.y);
-      }
+      const off = localOffset(root, el);
+      const x1 = off.x + bbox.x;
+      const y1 = off.y + bbox.y;
+      minX = Math.min(minX, x1);
+      minY = Math.min(minY, y1);
+      maxX = Math.max(maxX, x1 + bbox.width);
+      maxY = Math.max(maxY, y1 + bbox.height);
     }
     if (!Number.isFinite(minX)) return { x: 0, y: 0, width: 0, height: 0 };
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
@@ -134,17 +147,27 @@ export interface Collision {
 export async function collide(page: Page, svg: string): Promise<Collision[]> {
   await page.setContent(SETUP(svg));
   return page.evaluate(() => {
+    // See contentBBox's identical helper for why this is translate-summing rather than
+    // getCTM()-based (getCTM lands in physical-px viewport space for these mm-sized
+    // exports, not the viewBox/mm-equivalent space the stroke-width/1mm inflate below is
+    // expressed in).
+    const localOffset = (root: SVGSVGElement, el: Element): { x: number; y: number } => {
+      let x = 0;
+      let y = 0;
+      let node: Element | null = el;
+      while (node && node !== root) {
+        const consolidated = (node as unknown as SVGGraphicsElement).transform?.baseVal?.consolidate();
+        if (consolidated) {
+          x += consolidated.matrix.e;
+          y += consolidated.matrix.f;
+        }
+        node = node.parentElement;
+      }
+      return { x, y };
+    };
+
     const root = document.querySelector('svg');
     if (!root) throw new Error('collide: no <svg> in the provided markup');
-    const toRoot = (el: SVGGraphicsElement, x: number, y: number): { x: number; y: number } => {
-      const ctm = el.getCTM();
-      if (!ctm) return { x, y };
-      const pt = root.createSVGPoint();
-      pt.x = x;
-      pt.y = y;
-      const p = pt.matrixTransform(ctm);
-      return { x: p.x, y: p.y };
-    };
 
     interface Rect { id: string; x1: number; y1: number; x2: number; y2: number }
     const rects: Rect[] = [];
@@ -160,9 +183,10 @@ export async function collide(page: Page, svg: string): Promise<Collision[]> {
         continue;
       }
       if (bbox.width === 0 && bbox.height === 0) continue;
-      const a = toRoot(g, bbox.x, bbox.y);
-      const b = toRoot(g, bbox.x + bbox.width, bbox.y + bbox.height);
-      rects.push({ id, x1: Math.min(a.x, b.x), y1: Math.min(a.y, b.y), x2: Math.max(a.x, b.x), y2: Math.max(a.y, b.y) });
+      const off = localOffset(root, g);
+      const x1 = off.x + bbox.x;
+      const y1 = off.y + bbox.y;
+      rects.push({ id, x1, y1, x2: x1 + bbox.width, y2: y1 + bbox.height });
     }
 
     const hits: Array<{ from: string; to: string; hit: string; x: number; y: number }> = [];
@@ -170,16 +194,24 @@ export async function collide(page: Page, svg: string): Promise<Collision[]> {
       const p = path as SVGPathElement;
       const from = p.dataset.from ?? '';
       const to = p.dataset.to ?? '';
+      // `from` is a UNION id (flow-layout.ts: `edges.push({ fromId: n.union.id, ... })`),
+      // formatted "u:<personId>" (lone parent) or "u:<personId>+<personId>" (couple) — not
+      // a person id itself. The connector's anchor point legitimately sits at one of these
+      // partners' own capsule edge, so excluding only a literal `r.id === from` never
+      // matched anything and let every edge falsely "collide" with its own start capsule's
+      // text. Extract the actual partner ids to exclude instead.
+      const fromPartners = from.replace(/^u:/, '').split('+').filter(Boolean);
       const strokeWidthRaw = p.getAttribute('stroke-width') ?? getComputedStyle(p).strokeWidth;
       const strokeWidth = Number.parseFloat(strokeWidthRaw) || 0.35;
       const inflate = strokeWidth / 2 + 1; // mm clearance
+      const pathOff = localOffset(root, p);
       const total = p.getTotalLength();
       const samples = Math.min(512, Math.max(2, Math.ceil(total / 0.5)));
       for (let i = 0; i <= samples; i++) {
         const pt = p.getPointAtLength((i / samples) * total);
-        const abs = toRoot(p, pt.x, pt.y);
+        const abs = { x: pathOff.x + pt.x, y: pathOff.y + pt.y };
         for (const r of rects) {
-          if (r.id === from || r.id === to) continue;
+          if (fromPartners.includes(r.id) || r.id === to) continue;
           if (abs.x >= r.x1 - inflate && abs.x <= r.x2 + inflate && abs.y >= r.y1 - inflate && abs.y <= r.y2 + inflate) {
             hits.push({ from, to, hit: r.id, x: abs.x, y: abs.y });
           }
