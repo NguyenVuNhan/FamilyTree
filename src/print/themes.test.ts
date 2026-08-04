@@ -46,4 +46,17 @@ describe('themeCss', () => {
     expect(css).toContain('.connector');
     expect(css).toContain('#B9A48C');
   });
+
+  // Rendered/exported text must request the exact weight embedded in fontFiles — an
+  // implicit 400 against faces at 500-700 risks pre-press faux-bold substitution that
+  // silently invalidates legibility/collision measurements (see themeCss's doc comment).
+  it.each(themes.map((t) => [t.id, t]))('%s: title and name classes request the embedded weights', (_, t) => {
+    const css = themeCss(t);
+    const titleWeight = t.fontFiles.find((f) => t.titleFamily.includes(f.family))!.weight;
+    const nameWeight = t.fontFiles.find((f) => t.nameFamily.includes(f.family))!.weight;
+    expect(css).toMatch(new RegExp(`\\.pt-title\\{[^}]*font-weight:${titleWeight};`));
+    expect(css).toMatch(new RegExp(`\\.pn-name-title\\{[^}]*font-weight:${titleWeight};`));
+    expect(css).toMatch(new RegExp(`\\.pn-name\\{[^}]*font-weight:${nameWeight};`));
+    expect(css).toMatch(new RegExp(`\\.pn-years\\{[^}]*font-weight:${nameWeight};`));
+  });
 });

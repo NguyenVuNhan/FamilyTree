@@ -14,7 +14,7 @@ function liveSvg(): SVGSVGElement {
 }
 
 describe('buildExportSvg', () => {
-  const opts = { wMm: 1200, hMm: 600, marginMm: 60, fontCss: '@font-face{}', background: '#F5EBDC' };
+  const opts = { wMm: 1200, hMm: 600, fontCss: '@font-face{}', background: '#F5EBDC' };
   it('mm dimensions and matching viewBox aspect', () => {
     const out = buildExportSvg(liveSvg(), opts);
     expect(out).toContain('width="1200mm"');

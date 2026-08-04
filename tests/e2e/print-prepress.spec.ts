@@ -58,7 +58,7 @@ for (const { arr, fmt } of ARRANGEMENTS) {
 // Not in the brief's given code (only prose + threshold contract) and deliberately run
 // against `standard.csv` rather than `WORST`: this test is about per-theme rendered
 // contrast, a property of the theme tokens, not of tree density — and standard.csv
-// actually fits at every format's default, unlike WORST (see the fixme block above).
+// actually fits at every format's default, unlike WORST (see the DENSE/STANDARD note above).
 test('E2E-71: rendered contrast witness per theme (UC-76)', async ({ page }) => {
   for (const theme of THEME_TOKENS) {
     await page.goto(viewUrl(STANDARD, `arr:flow,theme:${theme.id}`, 'Std'));

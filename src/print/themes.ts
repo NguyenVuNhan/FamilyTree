@@ -75,17 +75,37 @@ export const THEMES: Record<ThemeId, ThemeTokens> = {
   },
 };
 
+const primaryFamily = (cssFontFamily: string): string =>
+  cssFontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '');
+
+/** The weight embedded in `fontFiles`/imported via `fontCssImports` for a given
+ *  `titleFamily`/`nameFamily` token — kept out of themeCss's hardcoded literals so a
+ *  theme can't drift: whatever weight is actually embedded is what gets requested. */
+function weightFor(t: ThemeTokens, cssFontFamily: string): number {
+  const name = primaryFamily(cssFontFamily);
+  const match = t.fontFiles.find((f) => f.family === name);
+  if (!match) throw new Error(`themeCss: theme "${t.id}" has no fontFiles entry for family "${name}"`);
+  return match.weight;
+}
+
 /** Style body shared by the on-canvas SVG and (via clone) the export. Units are
  *  SVG user units ≡ mm. Connector stroke 0.35 mm ≈ 1 pt — comfortably above the
- *  0.18 mm (0.5 pt) physical floor (risk R5). */
+ *  0.18 mm (0.5 pt) physical floor (risk R5).
+ *
+ *  Explicit font-weight matters beyond screen rendering: exported/printed text is
+ *  measured (legibility floor, collision checks) and pre-press tools embed/subset by
+ *  exact weight — an implicit 400 request against faces embedded at 500-700 risks
+ *  synthetic/faux-bold substitution that silently invalidates those measurements. */
 export function themeCss(t: ThemeTokens): string {
+  const titleWeight = weightFor(t, t.titleFamily);
+  const nameWeight = weightFor(t, t.nameFamily);
   return [
     `.pt-bg{fill:${t.background};}`,
-    `.pt-title{font-family:${t.titleFamily};fill:${t.accent};}`,
+    `.pt-title{font-family:${t.titleFamily};font-weight:${titleWeight};fill:${t.accent};}`,
     `.pn-capsule{fill:${t.nodeFill};stroke:${t.nodeBorder};}`,
-    `.pn-name{font-family:${t.nameFamily};fill:${t.text};}`,
-    `.pn-name-title{font-family:${t.titleFamily};fill:${t.text};}`, // F0/F1 names use the title face (spec: serif for title + F0/F1)
-    `.pn-years{font-family:${t.nameFamily};fill:${t.text};opacity:0.75;}`,
+    `.pn-name{font-family:${t.nameFamily};font-weight:${nameWeight};fill:${t.text};}`,
+    `.pn-name-title{font-family:${t.titleFamily};font-weight:${titleWeight};fill:${t.text};}`, // F0/F1 names use the title face (spec: serif for title + F0/F1)
+    `.pn-years{font-family:${t.nameFamily};font-weight:${nameWeight};fill:${t.text};opacity:0.75;}`,
     `.connector{stroke:${t.connector};fill:none;stroke-width:0.35;}`,
     `.pt-guide{stroke:${t.accent};fill:none;stroke-dasharray:4 3;opacity:0.5;}`,
   ].join('\n');

@@ -184,7 +184,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     collectFontCss(theme).then((fontCss) =>
       downloadSvg(
         buildExportSvg(document.querySelector('.print-canvas-svg')!, {
-          wMm: size.wMm, hMm: size.hMm, marginMm: settings.marginMm, fontCss, background: theme.background,
+          wMm: size.wMm, hMm: size.hMm, fontCss, background: theme.background,
         }),
         exportFilename(source.displayName, 'flow', settings.theme, size.wMm, size.hMm),
       ),
@@ -222,8 +222,9 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         </div>
       )}
       {isFlow && !fit.ok && (
-        // Blocks export/print (see exportDisabledReason above) — the canvas itself keeps
-        // rendering regardless, per spec: a fit failure never hides the tree.
+        // Blocks export only (see exportDisabledReason above) — print (window.print())
+        // and the canvas itself keep working regardless, per spec: a fit failure never
+        // hides the tree or the ability to print it.
         <div className="warnings" data-testid="fit-refusal">{fit.message}</div>
       )}
       {isFlow && exportError && (
@@ -250,7 +251,7 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
         // @page{size:landscape} purely by head insertion order — same specificity,
         // later wins — so PrintSheet must stay mounted after main.tsx's stylesheet import.
         <PrintSheet svgSelector=".print-canvas-svg" wMm={size.wMm} hMm={size.hMm}
-          marginMm={settings.marginMm} background={theme.background} />
+          background={theme.background} />
       )}
     </div>
   );

@@ -19,7 +19,7 @@ export async function collectFontCss(theme: ThemeTokens, fetcher: typeof fetch =
  *  content in the sheet, and adds a calibration bar + corner trim marks. No timestamps or
  *  randomness — identical inputs always produce byte-identical output. */
 export function buildExportSvg(svgEl: SVGSVGElement, opts: {
-  wMm: number; hMm: number; marginMm: number; fontCss: string; background: string;
+  wMm: number; hMm: number; fontCss: string; background: string;
 }): string {
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   clone.querySelectorAll('[data-print-role="guide"]').forEach((el) => el.remove());
