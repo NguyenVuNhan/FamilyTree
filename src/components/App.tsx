@@ -116,9 +116,15 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
   );
 
   const printMeasure = usePrintMeasure(settings.theme);
+  // Only the flow arrangement consumes the print scene — computing it in topDown
+  // would burn full-tree text measurement on every load for nothing (and its
+  // first-paint cost is what exposed E2E-16's snapshot race on slow CI runners).
   const scene = useMemo(
-    () => (data.status === 'ready' ? flowLayout(data.model, printMeasure) : null),
-    [data, printMeasure],
+    () =>
+      data.status === 'ready' && settings.arrangement === 'flow'
+        ? flowLayout(data.model, printMeasure)
+        : null,
+    [data, printMeasure, settings.arrangement],
   );
 
   // Never a silently wrong tree (spec §6): if the single-root layout walk couldn't

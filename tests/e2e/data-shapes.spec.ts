@@ -43,6 +43,9 @@ test('E2E-15: 5-generation chain renders and fits (UC-16)', async ({ page }) => 
 
 test('E2E-16: 9 siblings — no overlapping cards, parents centered (UC-17)', async ({ page }) => {
   await open(page, 'wide9.csv');
+  // evaluateAll does NOT auto-wait — without this count guard the snapshot races
+  // first paint (11 = ma + pa + 9 children), which is exactly how it flaked on CI.
+  await expect(page.locator('.person-card')).toHaveCount(11);
   const boxes = await page.locator('.person-card').evaluateAll((els) =>
     els.map((el) => {
       const r = el.getBoundingClientRect();
