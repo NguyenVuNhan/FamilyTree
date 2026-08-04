@@ -39,7 +39,9 @@ silhouettes), connector shape, and spacing sliders. Choices are saved per family
 
 ### Print & export
 
-The gear button's settings panel includes an **Arrangement** setting: **Top-down** (the default pan/zoom tree) or **Scroll**. Switching to Scroll turns on print mode and reveals the rest of the print controls:
+The gear button's settings panel includes an **Arrangement** setting: **Top-down** (the default pan/zoom tree), **Scroll**, or **Fan**. Switching to Scroll or Fan turns on print mode and reveals the rest of the print controls:
+
+- **Fan** lays the tree out as an Ancestral Fan: a 180° semicircle with the founding couple bottom-center and each generation forming a ring further out. Branch wedges are sized by descendant count, with a 10° minimum so small branches stay visible, and labels read outward along the radius, auto-flipping past vertical so nothing prints upside-down. A fan reads best wide and shallow — the panel hints when the current format is narrower than the recommended 2:1 landscape.
 
 - **Theme** — four print-only visual themes, each with its own type pairing and accent color: Indochine Vintage, Nordic Minimalist, Traditional Ink Wash, Royal Botanical.
 - **Format** — page-size presets A4, A3, A1, A0, Panorama (120×60 cm), Square (90×90 cm), or Custom (any size from 300mm up to 2000×1200mm).
@@ -50,7 +52,7 @@ The gear button's settings panel includes an **Arrangement** setting: **Top-down
 
 For an on-screen/paper copy instead of a file, use the browser's own **Print** (Ctrl/Cmd+P) — for large formats (A1, A0, Panorama, big Custom sizes) most browsers can't drive a physical printer at that size, so treat browser print as **Save as PDF** and send the PDF to a print shop; A4/A3 can go to a physical printer directly.
 
-Every tree has a legibility floor — the smallest generation's names must stay readable (≥6.5mm tall, the size that's still legible from about a meter away) — so a single Scroll panorama can only fit so many people (roughly 35, depending on name lengths and tree shape) before it stops fitting. If the current format is too small, the panel refuses with the minimum page size the tree actually needs, so you can pick a bigger format or go Custom. Export SVG is also blocked, listing the people by name, whenever someone can't be placed at all or sits in a disconnected part of the family (not connected to the main tree) — connect or remove them first. There's no multi-page/multi-panel export yet; very large families should be split into smaller sheets, or wait for a future multi-panel arrangement.
+Every tree has a legibility floor — the smallest generation's names must stay readable (≥6.5mm tall, the size that's still legible from about a meter away) — so a single Scroll panorama can only fit so many people (roughly 35, depending on name lengths and tree shape) before it stops fitting. At that same 6.5mm floor, a Fan panorama holds about 3–4 descendant generations (roughly 40–90 people) — the ring layout is naturally more compact than Scroll's linear one, but deeper trees still need A0/custom sizes today, or the Panels arrangement once it lands. If the current format is too small, the panel refuses with the minimum page size the tree actually needs, so you can pick a bigger format or go Custom. Export SVG is also blocked, listing the people by name, whenever someone can't be placed at all or sits in a disconnected part of the family (not connected to the main tree) — connect or remove them first. There's no multi-page/multi-panel export yet; very large families should be split into smaller sheets, or wait for a future multi-panel arrangement.
 
 Your share link (see [Link reference](#link-reference)) carries the arrangement, theme, format, margin, and frame-guide choices along with the rest of your layout view, so anyone opening it sees the same print setup you configured.
 
