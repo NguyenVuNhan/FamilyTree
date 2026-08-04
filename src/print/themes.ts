@@ -88,6 +88,14 @@ function weightFor(t: ThemeTokens, cssFontFamily: string): number {
   return match.weight;
 }
 
+/** Public form of `weightFor` for the title/name faces: the single source of truth for
+ *  "what weight does this theme actually render/export text at" — themeCss (render/export
+ *  CSS) and usePrintMeasure (canvas text measurement used for layout/wrap decisions) must
+ *  both read from here, or measured widths silently stop matching what gets drawn. */
+export function themeWeights(t: ThemeTokens): { title: number; name: number } {
+  return { title: weightFor(t, t.titleFamily), name: weightFor(t, t.nameFamily) };
+}
+
 /** Style body shared by the on-canvas SVG and (via clone) the export. Units are
  *  SVG user units ≡ mm. Connector stroke 0.35 mm ≈ 1 pt — comfortably above the
  *  0.18 mm (0.5 pt) physical floor (risk R5).
@@ -97,8 +105,7 @@ function weightFor(t: ThemeTokens, cssFontFamily: string): number {
  *  exact weight — an implicit 400 request against faces embedded at 500-700 risks
  *  synthetic/faux-bold substitution that silently invalidates those measurements. */
 export function themeCss(t: ThemeTokens): string {
-  const titleWeight = weightFor(t, t.titleFamily);
-  const nameWeight = weightFor(t, t.nameFamily);
+  const { title: titleWeight, name: nameWeight } = themeWeights(t);
   return [
     `.pt-bg{fill:${t.background};}`,
     `.pt-title{font-family:${t.titleFamily};font-weight:${titleWeight};fill:${t.accent};}`,

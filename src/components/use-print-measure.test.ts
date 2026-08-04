@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import type { ThemeId } from '../print/themes';
+import * as nameMetrics from '../layout/name-metrics';
+import { THEMES, themeCss, type ThemeId } from '../print/themes';
 import { usePrintMeasure } from './use-print-measure';
+
+// Wrapped (not replaced) so canvasMeasurer's real behavior is unchanged — this only lets
+// the drift-guard test below inspect the exact font string usePrintMeasure builds.
+vi.mock('../layout/name-metrics', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../layout/name-metrics')>();
+  return { ...actual, canvasMeasurer: vi.fn(actual.canvasMeasurer) };
+});
 
 const realFonts = document.fonts;
 afterEach(() => {
@@ -72,4 +80,47 @@ describe('usePrintMeasure', () => {
     rerender({ theme: 'nordic' });
     await waitFor(() => expect(loadCalls.some((f) => f.includes('Space Grotesk'))).toBe(true));
   });
+});
+
+// Closes the re-review gap: usePrintMeasure previously hardcoded "600 …" / "500 …"
+// regardless of theme, so inkwash (title Charm 700) and botanical (name Source Sans 3
+// 600) were measured at the wrong weight — different from what themeCss actually draws.
+// This cross-checks, per theme, that both the fonts.load() warm-up and the canvas
+// measurer's font string request the exact weight themeCss emits for the corresponding
+// class, so measured widths can never silently drift from rendered/exported ones again.
+describe('measure/render weight parity (Finding 2 closure)', () => {
+  const weightFromCss = (css: string, selector: string): number => {
+    const m = new RegExp(`\\.${selector}\\{[^}]*font-weight:(\\d+);`).exec(css);
+    if (!m) throw new Error(`no font-weight found for .${selector} in: ${css}`);
+    return Number(m[1]);
+  };
+
+  it.each(Object.values(THEMES).map((t) => [t.id, t] as const))(
+    '%s: fonts.load() and the canvas measurer request themeCss\'s exact title/name weights',
+    async (_, theme) => {
+      vi.mocked(nameMetrics.canvasMeasurer).mockClear();
+      const loadCalls: string[] = [];
+      stubFonts({
+        load: vi.fn((font: string) => { loadCalls.push(font); return Promise.resolve([]); }),
+        ready: Promise.resolve(),
+      });
+
+      const css = themeCss(theme);
+      const titleWeight = weightFromCss(css, 'pt-title');
+      const nameWeight = weightFromCss(css, 'pn-name');
+      expect(weightFromCss(css, 'pn-name-title')).toBe(titleWeight);
+      expect(weightFromCss(css, 'pn-years')).toBe(nameWeight);
+
+      const { result } = renderHook(() => usePrintMeasure(theme.id));
+      await waitFor(() => expect(loadCalls.length).toBeGreaterThanOrEqual(2));
+      expect(loadCalls.some((f) => f.startsWith(`${titleWeight} `))).toBe(true);
+      expect(loadCalls.some((f) => f.startsWith(`${nameWeight} `))).toBe(true);
+
+      result.current('Ancestor Name', 6, true);
+      result.current('Descendant Name', 4, false);
+      const measuredFonts = vi.mocked(nameMetrics.canvasMeasurer).mock.calls.map(([font]) => font);
+      expect(measuredFonts.some((f) => f.startsWith(`${titleWeight} `))).toBe(true);
+      expect(measuredFonts.some((f) => f.startsWith(`${nameWeight} `))).toBe(true);
+    },
+  );
 });
