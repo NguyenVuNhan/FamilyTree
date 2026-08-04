@@ -170,42 +170,98 @@ test.describe(() => {
   });
 });
 
-test('E2E-81: pan/zoom/expand interactions match the Top-down arrangement (UC-78)', async ({ page }) => {
-  await page.goto(viewUrl(STANDARD, 'arr:flow', 'Std'));
-  await expect(page.locator('g.person-node').first()).toBeVisible();
-  // usePrintMeasure (src/components/use-print-measure.ts) re-measures once the theme's
-  // faces finish loading and bumps a generation counter, which changes the flow scene's
-  // wMm/hMm and re-triggers PanZoomViewport's fit-to-view effect. Under parallel-worker
-  // CPU contention that refit can land mid-drag and silently shift the baseline this test
-  // measures against (reproduced as a deterministic ~3px-short delta) — settle fonts first.
+test('E2E-82: fan renders 200 people inside the semicircle — labels never upside-down, root couple bottom-center, floor wedges hold (UC-77, UC-86)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(viewUrl(WORST, 'arr:fan', 'Worst'));
+  await expect(page.locator('svg.print-canvas-svg[data-arrangement="fan"]')).toBeVisible();
+  await expect(page.locator('g.person-node')).toHaveCount(200);
   await page.evaluate(() => document.fonts.ready);
 
-  const before = await translateOf(page);
-  const vp = page.getByTestId('viewport');
-  const box = (await vp.boundingBox())!;
-  await page.mouse.move(box.x + 300, box.y + 300);
-  await page.mouse.down();
-  // A single jump (not `{ steps: N }`) — matches interactions.spec.ts's E2E-02 convention.
-  await page.mouse.move(box.x + 400, box.y + 350);
-  await page.mouse.up();
-  const after = await translateOf(page);
-  expect(after.x - before.x).toBeCloseTo(100, 0);
-  expect(after.y - before.y).toBeCloseTo(50, 0);
-
-  const beforeScale = await scaleOf(page);
-  await page.mouse.wheel(0, -240);
-  await expect.poll(() => scaleOf(page)).toBeGreaterThan(beforeScale * 1.01);
-
-  const node = page.locator('g.person-node').first();
-  await node.click();
-  await expect(page.getByTestId('print-expanded')).toBeVisible();
-  await node.click();
-  await expect(page.getByTestId('print-expanded')).toHaveCount(0);
-
-  // Exercises the same keydown handler a real Tab-then-Enter would reach (tabIndex=0 on
-  // the node); .focus() is used instead of walking the page's full Tab order, which is
-  // long and unrelated to what this test is verifying (keyboard activation parity).
-  await node.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByTestId('print-expanded')).toBeVisible();
+  const report = await page.evaluate(() => {
+    const svg = document.querySelector('svg.print-canvas-svg')!;
+    const svgRect = svg.getBoundingClientRect();
+    const bad: string[] = [];
+    let rootRect: DOMRect | null = null;
+    for (const node of Array.from(document.querySelectorAll('g.person-node'))) {
+      const id = node.getAttribute('data-person-id') ?? '(unknown)';
+      const rot = /rotate\((-?[\d.eE+-]+)\)/.exec(node.getAttribute('transform') ?? '');
+      const deg = rot ? Number(rot[1]) : 0;
+      if (Math.abs(deg) > 90.001) bad.push(`${id}: rotate(${deg}) reads upside-down`);
+      const r = node.getBoundingClientRect();
+      if (r.left < svgRect.left - 0.5 || r.right > svgRect.right + 0.5 ||
+          r.top < svgRect.top - 0.5 || r.bottom > svgRect.bottom + 0.5) {
+        bad.push(`${id}: escapes the canvas`);
+      }
+      if (node.getAttribute('data-generation') === '0' && !rootRect) rootRect = r;
+    }
+    const rootCx = rootRect ? (rootRect.left + rootRect.right) / 2 : NaN;
+    const rootCy = rootRect ? (rootRect.top + rootRect.bottom) / 2 : NaN;
+    return {
+      bad,
+      // founding couple bottom-center: horizontally within ±15% of the canvas
+      // middle, vertically in the bottom 45% (rings tower above it)
+      rootNearBottomCenter:
+        rootRect !== null &&
+        Math.abs(rootCx - (svgRect.left + svgRect.right) / 2) < svgRect.width * 0.15 &&
+        rootCy > svgRect.top + svgRect.height * 0.55,
+    };
+  });
+  expect(report.bad).toEqual([]);
+  expect(report.rootNearBottomCenter).toBe(true);
+  expect(errors).toEqual([]);
+  // The 10° wedge floor itself is pinned at unit level (fan-layout.test.ts, the
+  // 40-vs-1 branch test) — the DOM can't expose sector boundaries honestly.
 });
+
+test('E2E-83: fan aspect hint on a square format is soft — visible, never blocking (UC-80)', async ({ page }) => {
+  await page.goto(viewUrl(STANDARD, 'arr:fan,fmt:square', 'Std'));
+  await expect(page.locator('g.person-node').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Layout settings' }).click();
+  await expect(page.getByTestId('aspect-hint')).toContainText('2:1');
+  await expect(page.getByRole('button', { name: 'Export SVG' })).toBeEnabled(); // 7-person fan fits 90×90 — the hint blocks nothing
+  await page.getByRole('group', { name: 'Format' }).getByRole('button', { name: 'Panorama' }).click();
+  await expect(page.getByTestId('aspect-hint')).toHaveCount(0);
+});
+
+for (const arr of ['flow', 'fan'] as const) {
+  test(`E2E-81: pan/zoom/expand interactions match the Top-down arrangement — ${arr} (UC-78)`, async ({ page }) => {
+    await page.goto(viewUrl(STANDARD, `arr:${arr}`, 'Std'));
+    await expect(page.locator('g.person-node').first()).toBeVisible();
+    // usePrintMeasure (src/components/use-print-measure.ts) re-measures once the theme's
+    // faces finish loading and bumps a generation counter, which changes the print scene's
+    // wMm/hMm and re-triggers PanZoomViewport's fit-to-view effect. Under parallel-worker
+    // CPU contention that refit can land mid-drag and silently shift the baseline this test
+    // measures against (reproduced as a deterministic ~3px-short delta) — settle fonts first.
+    await page.evaluate(() => document.fonts.ready);
+
+    const before = await translateOf(page);
+    const vp = page.getByTestId('viewport');
+    const box = (await vp.boundingBox())!;
+    await page.mouse.move(box.x + 300, box.y + 300);
+    await page.mouse.down();
+    // A single jump (not `{ steps: N }`) — matches interactions.spec.ts's E2E-02 convention.
+    await page.mouse.move(box.x + 400, box.y + 350);
+    await page.mouse.up();
+    const after = await translateOf(page);
+    expect(after.x - before.x).toBeCloseTo(100, 0);
+    expect(after.y - before.y).toBeCloseTo(50, 0);
+
+    const beforeScale = await scaleOf(page);
+    await page.mouse.wheel(0, -240);
+    await expect.poll(() => scaleOf(page)).toBeGreaterThan(beforeScale * 1.01);
+
+    const node = page.locator('g.person-node').first();
+    await node.click();
+    await expect(page.getByTestId('print-expanded')).toBeVisible();
+    await node.click();
+    await expect(page.getByTestId('print-expanded')).toHaveCount(0);
+
+    // Exercises the same keydown handler a real Tab-then-Enter would reach (tabIndex=0 on
+    // the node); .focus() is used instead of walking the page's full Tab order, which is
+    // long and unrelated to what this test is verifying (keyboard activation parity).
+    await node.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('print-expanded')).toBeVisible();
+  });
+}

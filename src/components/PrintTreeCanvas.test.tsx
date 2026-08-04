@@ -58,3 +58,42 @@ describe('PrintTreeCanvas', () => {
     expect(screen.getByTestId('print-expanded')).toHaveTextContent('1930–1990');
   });
 });
+
+describe('fan rendering (PR ②)', () => {
+  const fanScene: PrintScene = {
+    nodes: [
+      { personId: 'r2', xMm: 40, yMm: 60, wMm: 40, hMm: 12, generation: 0, nameLines: ['Root'], years: null, fontMm: 12, titleFace: true },
+      { personId: 'r3', xMm: 70, yMm: 30, wMm: 30, hMm: 10, generation: 1, nameLines: ['Child'], years: null, fontMm: 10.2, titleFace: true, rotateDeg: -45 },
+    ],
+    edges: [{ d: 'M 60 60 C 62 55 66 50 70 35', fromId: 'u:x', toId: 'r3' }],
+    wMm: 120, hMm: 80,
+  };
+  it('rotated nodes render translate + rotate; unrotated nodes stay translate-only', () => {
+    const { container } = render(
+      <PrintTreeCanvas scene={fanScene} theme={THEMES.indochine} title="T" guide={null}
+        expandedId={null} onToggle={() => {}} arrangement="fan" />,
+    );
+    expect(container.querySelector('[data-person-id="r3"]')!.getAttribute('transform')).toBe('translate(70 30) rotate(-45)');
+    expect(container.querySelector('[data-person-id="r2"]')!.getAttribute('transform')).toBe('translate(40 60)');
+  });
+  it('fan: data-arrangement=fan and the title cartouche sits BELOW the scene (ornament zone under the root)', () => {
+    const { container } = render(
+      <PrintTreeCanvas scene={fanScene} theme={THEMES.indochine} title="Gia Phả" guide={null}
+        expandedId={null} onToggle={() => {}} arrangement="fan" />,
+    );
+    expect(container.querySelector('svg')!.getAttribute('data-arrangement')).toBe('fan');
+    const titleY = Number(container.querySelector('text.pt-title')!.getAttribute('y'));
+    expect(titleY).toBeGreaterThan(fanScene.hMm); // below the content, inside the bottom strip
+    // content group is NOT pushed down when the title is at the bottom:
+    expect(container.querySelector('svg > g')!.getAttribute('transform')).toBe('translate(0 0)');
+  });
+  it('default arrangement stays flow — existing markup untouched', () => {
+    const { container } = render(
+      <PrintTreeCanvas scene={fanScene} theme={THEMES.indochine} title="T" guide={null}
+        expandedId={null} onToggle={() => {}} />,
+    );
+    expect(container.querySelector('svg')!.getAttribute('data-arrangement')).toBe('flow');
+    const titleY = Number(container.querySelector('text.pt-title')!.getAttribute('y'));
+    expect(titleY).toBeLessThan(30); // top strip, as before
+  });
+});

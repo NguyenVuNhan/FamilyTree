@@ -57,54 +57,42 @@ const SETUP = (svg: string) => `<!doctype html><html><body>${svg}</body></html>`
 export async function contentBBox(page: Page, svg: string): Promise<{ x: number; y: number; width: number; height: number }> {
   await page.setContent(SETUP(svg));
   return page.evaluate(() => {
-    // An element's absolute position needs to land in the root <svg>'s OWN coordinate
-    // system (viewBox units, i.e. mm-equivalent per parseDims's mmPerUnit) — NOT
-    // `getCTM()`/`getScreenCTM()`, which resolve into the root's established *viewport*
-    // space. Because this app's exports set width/height to physical "mm" values, that
-    // viewport space is actual CSS px (1 viewBox unit ≈ 3.78px at 96dpi), not viewBox
-    // units — confirmed empirically (getCTM-based coordinates came back ~3.78x too large
-    // on a 1200x600mm export). PrintTreeCanvas/buildExportSvg only ever nest plain
-    // `translate(x y)` transforms (no scale/rotate), so summing each ancestor's
-    // consolidated translate up to (not including) `root` is an exact, CTM-free fix.
-    const localOffset = (root: SVGSVGElement, el: Element): { x: number; y: number } => {
-      let x = 0;
-      let y = 0;
+    // Rotation-aware (PR ②: fan nodes carry `rotate(...)` after their translate):
+    // accumulate the FULL consolidated matrix root→element in document order and
+    // map the local bbox's four corners through it. Still avoids getCTM(), which
+    // resolves into the root's physical-px viewport space for these mm-sized
+    // exports (the PR ① finding) — matrix accumulation stays in viewBox units.
+    const localMatrix = (root: SVGSVGElement, el: Element): DOMMatrix => {
+      const chain: Element[] = [];
       let node: Element | null = el;
-      while (node && node !== root) {
-        const consolidated = (node as unknown as SVGGraphicsElement).transform?.baseVal?.consolidate();
-        if (consolidated) {
-          x += consolidated.matrix.e;
-          y += consolidated.matrix.f;
-        }
-        node = node.parentElement;
+      while (node && node !== root) { chain.unshift(node); node = node.parentElement; }
+      let m = new DOMMatrix();
+      for (const link of chain) {
+        const c = (link as unknown as SVGGraphicsElement).transform?.baseVal?.consolidate();
+        if (c) m = m.multiply(c.matrix);
       }
-      return { x, y };
+      return m;
     };
 
     const root = document.querySelector('svg');
     if (!root) throw new Error('contentBBox: no <svg> in the provided markup');
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const el of Array.from(root.querySelectorAll('*'))) {
       if (el.closest('[data-print-role]')) continue;
       if (!('getBBox' in el)) continue;
       const g = el as SVGGraphicsElement;
       let bbox: DOMRect;
-      try {
-        bbox = g.getBBox();
-      } catch {
-        continue;
-      }
+      try { bbox = g.getBBox(); } catch { continue; }
       if (bbox.width === 0 && bbox.height === 0) continue;
-      const off = localOffset(root, el);
-      const x1 = off.x + bbox.x;
-      const y1 = off.y + bbox.y;
-      minX = Math.min(minX, x1);
-      minY = Math.min(minY, y1);
-      maxX = Math.max(maxX, x1 + bbox.width);
-      maxY = Math.max(maxY, y1 + bbox.height);
+      const m = localMatrix(root, el);
+      for (const [px, py] of [
+        [bbox.x, bbox.y], [bbox.x + bbox.width, bbox.y],
+        [bbox.x, bbox.y + bbox.height], [bbox.x + bbox.width, bbox.y + bbox.height],
+      ]) {
+        const p = m.transformPoint(new DOMPoint(px, py));
+        minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+      }
     }
     if (!Number.isFinite(minX)) return { x: 0, y: 0, width: 0, height: 0 };
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
@@ -147,46 +135,37 @@ export interface Collision {
 export async function collide(page: Page, svg: string): Promise<Collision[]> {
   await page.setContent(SETUP(svg));
   return page.evaluate(() => {
-    // See contentBBox's identical helper for why this is translate-summing rather than
-    // getCTM()-based (getCTM lands in physical-px viewport space for these mm-sized
-    // exports, not the viewBox/mm-equivalent space the stroke-width/1mm inflate below is
-    // expressed in).
-    const localOffset = (root: SVGSVGElement, el: Element): { x: number; y: number } => {
-      let x = 0;
-      let y = 0;
+    const localMatrix = (root: SVGSVGElement, el: Element): DOMMatrix => {
+      const chain: Element[] = [];
       let node: Element | null = el;
-      while (node && node !== root) {
-        const consolidated = (node as unknown as SVGGraphicsElement).transform?.baseVal?.consolidate();
-        if (consolidated) {
-          x += consolidated.matrix.e;
-          y += consolidated.matrix.f;
-        }
-        node = node.parentElement;
+      while (node && node !== root) { chain.unshift(node); node = node.parentElement; }
+      let m = new DOMMatrix();
+      for (const link of chain) {
+        const c = (link as unknown as SVGGraphicsElement).transform?.baseVal?.consolidate();
+        if (c) m = m.multiply(c.matrix);
       }
-      return { x, y };
+      return m;
     };
 
     const root = document.querySelector('svg');
     if (!root) throw new Error('collide: no <svg> in the provided markup');
 
-    interface Rect { id: string; x1: number; y1: number; x2: number; y2: number }
-    const rects: Rect[] = [];
+    interface TRect { id: string; inv: DOMMatrix; x1: number; y1: number; x2: number; y2: number }
+    const rects: TRect[] = [];
     for (const text of Array.from(root.querySelectorAll('text'))) {
       const owner = text.closest('[data-person-id]') as HTMLElement | SVGElement | null;
       const id = owner?.getAttribute('data-person-id');
       if (!id) continue;
       const g = text as unknown as SVGGraphicsElement;
       let bbox: DOMRect;
-      try {
-        bbox = g.getBBox();
-      } catch {
-        continue;
-      }
+      try { bbox = g.getBBox(); } catch { continue; }
       if (bbox.width === 0 && bbox.height === 0) continue;
-      const off = localOffset(root, g);
-      const x1 = off.x + bbox.x;
-      const y1 = off.y + bbox.y;
-      rects.push({ id, x1, y1, x2: x1 + bbox.width, y2: y1 + bbox.height });
+      // Local rect + inverse matrix: samples are tested in the text's own frame,
+      // where the strokeWidth/2 + 1mm inflation is exact even under rotation.
+      rects.push({
+        id, inv: localMatrix(root, g).inverse(),
+        x1: bbox.x, y1: bbox.y, x2: bbox.x + bbox.width, y2: bbox.y + bbox.height,
+      });
     }
 
     const hits: Array<{ from: string; to: string; hit: string; x: number; y: number }> = [];
@@ -194,25 +173,22 @@ export async function collide(page: Page, svg: string): Promise<Collision[]> {
       const p = path as SVGPathElement;
       const from = p.dataset.from ?? '';
       const to = p.dataset.to ?? '';
-      // `from` is a UNION id (flow-layout.ts: `edges.push({ fromId: n.union.id, ... })`),
-      // formatted "u:<personId>" (lone parent) or "u:<personId>+<personId>" (couple) — not
-      // a person id itself. The connector's anchor point legitimately sits at one of these
-      // partners' own capsule edge, so excluding only a literal `r.id === from` never
-      // matched anything and let every edge falsely "collide" with its own start capsule's
-      // text. Extract the actual partner ids to exclude instead.
+      // `from` is a UNION id ("u:<id>" or "u:<id>+<id>") — exclude its partners,
+      // whose capsules the connector legitimately touches (unchanged from PR ①).
       const fromPartners = from.replace(/^u:/, '').split('+').filter(Boolean);
       const strokeWidthRaw = p.getAttribute('stroke-width') ?? getComputedStyle(p).strokeWidth;
       const strokeWidth = Number.parseFloat(strokeWidthRaw) || 0.35;
       const inflate = strokeWidth / 2 + 1; // mm clearance
-      const pathOff = localOffset(root, p);
+      const pm = localMatrix(root, p);
       const total = p.getTotalLength();
       const samples = Math.min(512, Math.max(2, Math.ceil(total / 0.5)));
       for (let i = 0; i <= samples; i++) {
         const pt = p.getPointAtLength((i / samples) * total);
-        const abs = { x: pathOff.x + pt.x, y: pathOff.y + pt.y };
+        const abs = pm.transformPoint(new DOMPoint(pt.x, pt.y));
         for (const r of rects) {
           if (fromPartners.includes(r.id) || r.id === to) continue;
-          if (abs.x >= r.x1 - inflate && abs.x <= r.x2 + inflate && abs.y >= r.y1 - inflate && abs.y <= r.y2 + inflate) {
+          const lp = r.inv.transformPoint(abs);
+          if (lp.x >= r.x1 - inflate && lp.x <= r.x2 + inflate && lp.y >= r.y1 - inflate && lp.y <= r.y2 + inflate) {
             hits.push({ from, to, hit: r.id, x: abs.x, y: abs.y });
           }
         }

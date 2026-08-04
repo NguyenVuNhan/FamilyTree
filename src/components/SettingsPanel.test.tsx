@@ -83,3 +83,27 @@ describe('print controls gating (UC-78)', () => {
     expect(screen.getByTestId('aspect-hint')).toBeInTheDocument();
   });
 });
+
+describe('fan arrangement + aspect hint (PR ②)', () => {
+  const fan = { ...DEFAULT_SETTINGS, arrangement: 'fan' as const };
+  it('Fan option exists and gates card controls exactly like flow', () => {
+    render(<SettingsPanel settings={fan} onChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Fan' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('group', { name: 'Card style' }).querySelector('button')).toBeDisabled();
+    expect(screen.getByRole('group', { name: 'Theme' })).toBeInTheDocument();
+  });
+  it('fan hints ≥2:1 landscape on square-ish formats only; the hint never blocks anything', () => {
+    const { rerender } = render(<SettingsPanel settings={{ ...fan, format: 'square' }} onChange={() => {}} />);
+    expect(screen.getByTestId('aspect-hint')).toHaveTextContent('2:1');
+    rerender(<SettingsPanel settings={{ ...fan, format: 'pano' }} onChange={() => {}} />);
+    expect(screen.queryByTestId('aspect-hint')).toBeNull();
+    rerender(<SettingsPanel settings={{ ...fan, format: 'a4' }} onChange={() => {}} />);
+    expect(screen.queryByTestId('aspect-hint')).toBeNull(); // A-landscape ≈ 1.414 is not square-ish
+    rerender(<SettingsPanel settings={{ ...fan, format: 'custom', customWmm: 900, customHmm: 800 }} onChange={() => {}} />);
+    expect(screen.getByTestId('aspect-hint')).toHaveTextContent('2:1'); // 1.125 < 1.2
+  });
+  it('flow keeps its original hint, unchanged', () => {
+    render(<SettingsPanel settings={{ ...DEFAULT_SETTINGS, arrangement: 'flow', format: 'square' }} onChange={() => {}} />);
+    expect(screen.getByTestId('aspect-hint')).toHaveTextContent('Scroll reads best on a wide format');
+  });
+});

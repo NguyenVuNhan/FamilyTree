@@ -288,3 +288,35 @@ describe('flow arrangement (UC-77/82/89)', () => {
     consoleError.mockRestore();
   });
 });
+
+describe('fan arrangement (UC-77, PR ②)', () => {
+  const csvFetch = (csv: string) => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => csv }) as Response));
+
+  it('renders the fan scene through the same SVG path: dataset, data-arrangement, print sheet, export enabled', async () => {
+    csvFetch('Image,Gen 1,Gen 2\n,Ông Nội (1900–1980) + Bà Nội,\n,,Con Trai');
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:fan')}`);
+    render(<App />);
+    expect((await screen.findAllByRole('button', { name: /Ông/ })).length).toBeGreaterThan(0);
+    expect(document.body.dataset.printArrangement).toBe('fan');
+    const svg = document.querySelector('svg.print-canvas-svg')!;
+    expect(svg.getAttribute('data-arrangement')).toBe('fan');
+    expect(screen.getByTestId('print-sheet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export SVG' })).toBeEnabled();
+    // Fan-only fact: a rotated capsule transform, which flowLayout never emits —
+    // proves the fan branch actually ran fanLayout, not flowLayout under a fan label.
+    expect(document.querySelector('.person-node[transform*="rotate("]')).toBeTruthy();
+  });
+
+  it('fit refusal fires on fan too — legibility floor first, then refuse (a4 + wide tree)', async () => {
+    const wide = [
+      'Image,Gen 1,Gen 2',
+      ',Ông Tổ Đường Rất Là Dài + Bà Tổ Đường Rất Là Dài,',
+      ...Array.from({ length: 12 }, (_, i) => `,,Người Con Thứ ${i + 1} Có Tên Rất Là Dài Để Vượt Khổ A4`),
+    ].join('\n');
+    csvFetch(wide);
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:fan,fmt:a4')}`);
+    render(<App />);
+    expect(await screen.findByTestId('fit-refusal')).toHaveTextContent('cm');
+    expect(screen.getByRole('button', { name: 'Export SVG' })).toBeDisabled();
+  });
+});

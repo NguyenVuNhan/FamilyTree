@@ -12,7 +12,13 @@ import { exportSvg, FIXTURE_SERVER, viewUrl } from './helpers';
 // at a 60mm margin — target=28 → 35 people, empirically the largest that comfortably fits).
 const DENSE = `${FIXTURE_SERVER}/stair-dense-35.csv`;
 const STANDARD = `${FIXTURE_SERVER}/standard.csv`;
-const ARRANGEMENTS = [{ arr: 'flow', fmt: 'pano' }]; // PR ② appends fan, PR ③ panels, PR ④ stacks
+// stair-dense-35 drives BOTH arrangements: its deepest content sits at ring 3,
+// so the fan fits panorama at a 60mm margin with ~30mm radial slack (see the
+// PR ② plan's capacity table); worst-200 stays refusal/perf-only, as in PR ①.
+const ARRANGEMENTS = [
+  { arr: 'flow', fmt: 'pano' },
+  { arr: 'fan', fmt: 'pano' },
+]; // PR ③ appends panels, PR ④ stacks
 
 // See tests/e2e/print-arrangements.spec.ts for the shared note on why THEMES can't be
 // imported here (themes.ts pulls in Vite-only *.woff2?url asset imports that Node's

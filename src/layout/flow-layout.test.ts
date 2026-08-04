@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { FamilyModel, Person } from '../data/types';
-import { NAME_FONT_MM, flowLayout, printUnplacedIds, yearFontMm, type PrintMeasurer, type PrintScene } from './flow-layout';
+import {
+  NAME_FONT_MM,
+  buildPrintTree,
+  capsule,
+  flowLayout,
+  printUnplacedIds,
+  yearFontMm,
+  type PrintMeasurer,
+  type PrintScene,
+} from './flow-layout';
 
 const measure: PrintMeasurer = (text, fontMm) => text.length * fontMm * 0.5; // deterministic fake
 
@@ -265,5 +274,34 @@ describe('flowLayout', () => {
     const scene = flowLayout(couple([]), measure);
     expect(scene.nodes.find((n) => n.personId === 'a')!.years).toBe('b. 1930');
     expect(scene.nodes.find((n) => n.personId === 'b')!.years).toBeNull();
+  });
+});
+
+describe('shared print-tree primitives (PR ② prep)', () => {
+  it('buildPrintTree walks unions once and returns a person node for a p: root', () => {
+    const m = couple([{ id: 'c1' }, { id: 'c2' }]);
+    const tree = buildPrintTree(m);
+    expect(tree.kind).toBe('union');
+    if (tree.kind === 'union') {
+      expect(tree.union.id).toBe('u:a+b');
+      expect(tree.children.map((c) => (c.kind === 'person' ? c.personId : ''))).toEqual(['c1', 'c2']);
+    }
+    const solo: FamilyModel = {
+      persons: new Map([['s', { id: 's', fullName: 'S', cleanName: 'S' }]]),
+      unions: [], rootId: 'p:s', excludedIds: [], excludedNames: [],
+    };
+    expect(buildPrintTree(solo)).toEqual({ kind: 'person', personId: 's' });
+  });
+
+  it('capsule is exported, floor-clamps past the tier table, and wraps names', () => {
+    const c = capsule({ id: 'x', fullName: 'Xuân', cleanName: 'Xuân' }, 9, measure);
+    expect(c.fontMm).toBe(6.5);
+    expect(c.titleFace).toBe(false);
+    expect(c.nameLines).toEqual(['Xuân']);
+  });
+
+  it('PrintNode.rotateDeg is optional — flow scenes never set it', () => {
+    const scene = flowLayout(couple([{ id: 'c1' }]), measure);
+    for (const n of scene.nodes) expect(n.rotateDeg).toBeUndefined();
   });
 });

@@ -59,3 +59,16 @@ describe('print view keys (UC-90..92)', () => {
     expect(decodeView(encodeView(settings)!)).toEqual(settings);
   });
 });
+
+describe('arr:fan (PR ②)', () => {
+  it('round-trips', () => {
+    const s = { ...DEFAULT_SETTINGS, arrangement: 'fan' as const };
+    expect(encodeView(s)).toBe('arr:fan');
+    expect(decodeView('arr:fan')).toEqual(s);
+  });
+  it('fan combines with the other print keys', () => {
+    expect(decodeView('arr:fan,theme:botanical,fmt:square')).toMatchObject({
+      arrangement: 'fan', theme: 'botanical', format: 'square',
+    });
+  });
+});

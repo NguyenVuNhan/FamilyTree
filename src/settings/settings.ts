@@ -4,7 +4,7 @@ import { PRINT_BOUNDS } from '../print/formats';
 import type { ThemeId } from '../print/themes';
 
 export type CardStyle = 'classic' | 'circle' | 'photoLeft' | 'archCard';
-export type Arrangement = 'topDown' | 'flow'; // PR ② adds 'fan', PR ③ 'panels', PR ④ 'stacks'
+export type Arrangement = 'topDown' | 'flow' | 'fan'; // PR ③ adds 'panels', PR ④ 'stacks'
 export type ContentMode = 'full' | 'name' | 'avatar';
 export type NamePosition = 'top' | 'bottom';
 export type ConnectorStyle = 'elbow' | 'curved' | 'straight';
@@ -60,7 +60,7 @@ const CONTENT_MODES: readonly ContentMode[] = ['full', 'name', 'avatar'];
 const NAME_POSITIONS: readonly NamePosition[] = ['top', 'bottom'];
 const CONNECTOR_STYLES: readonly ConnectorStyle[] = ['elbow', 'curved', 'straight'];
 const PLACEHOLDER_STYLES: readonly PlaceholderStyle[] = ['initials', 'illustrated'];
-const ARRANGEMENTS: readonly Arrangement[] = ['topDown', 'flow'];
+const ARRANGEMENTS: readonly Arrangement[] = ['topDown', 'flow', 'fan'];
 const THEME_IDS: readonly ThemeId[] = ['indochine', 'nordic', 'inkwash', 'botanical'];
 const FORMAT_IDS: readonly FormatId[] = ['a4', 'a3', 'a1', 'a0', 'pano', 'square', 'custom'];
 

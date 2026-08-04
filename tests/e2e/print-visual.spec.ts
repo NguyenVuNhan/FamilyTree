@@ -61,12 +61,21 @@ test('E2E-75: print media renders the flow print-sheet at physical size (UC-83) 
   await expect(page).toHaveScreenshot('print-flow-sheet.png', { maxDiffPixelRatio: 0.02 });
 });
 
-const FLOW_THEMES = ['indochine', 'nordic', 'inkwash', 'botanical'] as const;
-for (const theme of FLOW_THEMES) {
+const PRINT_THEMES = ['indochine', 'nordic', 'inkwash', 'botanical'] as const;
+for (const theme of PRINT_THEMES) {
   test(`E2E-79: flow visual regression — ${theme} theme (UC-76) — local guard, CI ignores snapshots`, async ({ page }) => {
     await page.route('https://img.example/**', (r) => r.abort());
     await page.goto(viewUrl(STANDARD, `arr:flow,theme:${theme}`, 'Std'));
     await expect(page.locator('g.person-node').first()).toBeVisible();
     await expect(page).toHaveScreenshot(`flow-${theme}.png`, { maxDiffPixelRatio: 0.02 });
+  });
+}
+
+for (const theme of PRINT_THEMES) {
+  test(`E2E-84: fan visual regression — ${theme} theme (UC-76) — local guard, CI ignores snapshots`, async ({ page }) => {
+    await page.route('https://img.example/**', (r) => r.abort());
+    await page.goto(viewUrl(STANDARD, `arr:fan,theme:${theme}`, 'Std'));
+    await expect(page.locator('g.person-node').first()).toBeVisible();
+    await expect(page).toHaveScreenshot(`fan-${theme}.png`, { maxDiffPixelRatio: 0.02 });
   });
 }
