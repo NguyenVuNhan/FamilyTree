@@ -95,7 +95,8 @@ test('E2E-78: registry entries never carry ?view=, and the demo family accepts a
   expect(entries).toHaveLength(1); // the plain load and the view-link load dedupe to one entry
   expect(entries[0].search).not.toContain('view='); // the registry's shortcut URL is always the canonical (view-free) one
 
-  await page.goto(`/?family=demo&view=${encodeURIComponent('arr:flow,theme:botanical')}`);
+  await page.goto(`/?family=demo&view=${encodeURIComponent('arr:fan,theme:botanical')}`);
+  await expect(page.locator('svg.print-canvas-svg[data-arrangement="fan"]')).toBeVisible();
   await expect(page.locator('g.person-node').first()).toBeVisible();
   const capsuleFill = await page.locator('rect.pn-capsule').first().evaluate((el) => getComputedStyle(el).fill);
   expect(capsuleFill).toBe('rgb(247, 243, 232)'); // botanical's nodeFill #F7F3E8
