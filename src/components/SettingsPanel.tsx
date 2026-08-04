@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { DEFAULT_SETTINGS, printControlsActive, SPACING_BOUNDS, type LayoutSettings } from '../settings/settings';
-import { PRINT_BOUNDS, parseCustomFmt } from '../print/formats';
+import { PRINT_BOUNDS, formatSizeMm, parseCustomFmt } from '../print/formats';
 
 const CARD_STYLES = [['classic', 'Classic'], ['circle', 'Circle'], ['photoLeft', 'Photo left'], ['archCard', 'Arch']] as const;
 const CONTENT_MODES = [['full', 'Full'], ['name', 'Name'], ['avatar', 'Avatar']] as const;
 const NAME_POSITIONS = [['top', 'Top'], ['bottom', 'Bottom']] as const;
 const PLACEHOLDERS = [['initials', 'Initials'], ['illustrated', 'Illustrated']] as const;
 const CONNECTORS = [['elbow', 'Elbow'], ['curved', 'Curved'], ['straight', 'Straight']] as const;
-const ARRANGEMENTS = [['topDown', 'Top-down'], ['flow', 'Scroll']] as const;
+const ARRANGEMENTS = [['topDown', 'Top-down'], ['flow', 'Scroll'], ['fan', 'Fan']] as const;
 const THEME_OPTIONS = [['indochine', 'Indochine'], ['nordic', 'Nordic'], ['inkwash', 'Ink wash'], ['botanical', 'Botanical']] as const;
 const FORMAT_OPTIONS = [
   ['a4', 'A4'], ['a3', 'A3'], ['a1', 'A1'], ['a0', 'A0'], ['pano', 'Panorama'], ['square', 'Square'], ['custom', 'Custom'],
@@ -90,6 +90,17 @@ export function SettingsPanel({ settings, onChange }: {
   const nameDisabled = printActive || nameContentDisabled;
   const nameDisabledReason = printActive ? CARD_DISABLED_REASON : 'Applies in Full mode (Photo left places the name itself)';
 
+  // Aspect-ratio SOFT hints (spec Error-handling 4 — never block): flow keeps its
+  // original square-only hint; fan wants ≥ 2:1 landscape and hints on square-ish
+  // formats (w/h < 1.2 — square and near-square customs; A-landscape ≈ 1.414 is fine).
+  const { wMm: fmtW, hMm: fmtH } = formatSizeMm(settings);
+  const aspectHint =
+    settings.arrangement === 'flow' && settings.format === 'square'
+      ? 'Scroll reads best on a wide format'
+      : settings.arrangement === 'fan' && fmtW / fmtH < 1.2
+        ? 'A fan reads best on a wide landscape format — 2:1 or wider'
+        : null;
+
   return (
     <div className="settings-panel" data-testid="settings-panel" role="dialog" aria-label="Layout settings">
       <Segmented label="Arrangement" value={settings.arrangement} options={ARRANGEMENTS} onSelect={(v) => set('arrangement', v)} />
@@ -98,8 +109,8 @@ export function SettingsPanel({ settings, onChange }: {
           <Segmented label="Theme" value={settings.theme} options={THEME_OPTIONS} onSelect={(v) => set('theme', v)} />
           <Segmented label="Format" value={settings.format} options={FORMAT_OPTIONS} onSelect={(v) => set('format', v)} />
           {settings.format === 'custom' && <CustomSizeRow settings={settings} onChange={onChange} />}
-          {settings.format === 'square' && (
-            <p className="settings-hint" data-testid="aspect-hint">Scroll reads best on a wide format</p>
+          {aspectHint && (
+            <p className="settings-hint" data-testid="aspect-hint">{aspectHint}</p>
           )}
           <SliderRow
             label="Safe margin" unit="mm" value={settings.marginMm} bounds={PRINT_BOUNDS.marginMm}

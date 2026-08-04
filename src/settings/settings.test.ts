@@ -86,3 +86,13 @@ describe('print settings fields', () => {
     expect(printControlsActive({ ...DEFAULT_SETTINGS, arrangement: 'flow' })).toBe(true);
   });
 });
+
+describe('fan arrangement (PR ②)', () => {
+  it('sanitize accepts fan; junk still falls back', () => {
+    expect(sanitizeSettings({ arrangement: 'fan' }).arrangement).toBe('fan');
+    expect(sanitizeSettings({ arrangement: 'fans' }).arrangement).toBe('topDown');
+  });
+  it('printControlsActive is true for fan', () => {
+    expect(printControlsActive({ ...DEFAULT_SETTINGS, arrangement: 'fan' })).toBe(true);
+  });
+});
