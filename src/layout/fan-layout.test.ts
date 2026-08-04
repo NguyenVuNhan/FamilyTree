@@ -59,6 +59,17 @@ function insideNode(n: PrintNode, px: number, py: number): boolean {
   const ly = dx * Math.sin(rot) + dy * Math.cos(rot);
   return lx >= 0 && lx <= n.wMm && ly >= 0 && ly <= n.hMm;
 }
+// Exact AABB of a rotated quad — a conservative prefilter for the O(n²)/O(edges·samples·nodes)
+// sweeps below: any point (or quad) outside it cannot touch the OBB, so the trig/SAT work is
+// skipped. The n≈200 stress test timed out on CI's 30s default without this pruning.
+function aabbOf(q: { x: number; y: number }[]): { minX: number; maxX: number; minY: number; maxY: number } {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of q) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  return { minX, maxX, minY, maxY };
+}
 
 /** ~200-person wide tree, sized via a dominant branch (rootKids=2, kidsEach up
  *  to 194 leaves): one branch captures nearly the whole semicircle, so its own
@@ -77,10 +88,17 @@ function wideModel(kidsEach = 196): FamilyModel {
 }
 
 function assertNoOBBOverlap(scene: PrintScene): void {
-  for (const a of scene.nodes) for (const b of scene.nodes) {
-    if (a === b) continue;
-    expect(overlapOBB(nodeCorners(a), nodeCorners(b)), `${a.personId} vs ${b.personId}`).toBe(false);
+  // Same check as pairwise expect(overlapOBB(...)) — violations are collected and asserted
+  // once so 40k passing pairs don't each pay expect() + message-interpolation overhead.
+  const quads = scene.nodes.map((n) => nodeCorners(n));
+  const boxes = quads.map(aabbOf);
+  const bad: string[] = [];
+  for (let i = 0; i < quads.length; i++) for (let j = i + 1; j < quads.length; j++) {
+    const a = boxes[i], b = boxes[j];
+    if (a.maxX <= b.minX || b.maxX <= a.minX || a.maxY <= b.minY || b.maxY <= a.minY) continue;
+    if (overlapOBB(quads[i], quads[j])) bad.push(`${scene.nodes[i].personId} vs ${scene.nodes[j].personId}`);
   }
+  expect(bad).toEqual([]);
 }
 
 /** 65-sample bézier sweep vs every non-endpoint capsule. Only the edge's own
@@ -92,6 +110,8 @@ function assertNoOBBOverlap(scene: PrintScene): void {
 function assertNoConnectorIntrusion(m: FamilyModel, scene: PrintScene): void {
   const partnersOf = new Map(m.unions.map((u) => [u.id, u.partners as readonly string[]]));
   const rootPartners = new Set(m.rootId.startsWith('p:') ? [] : (partnersOf.get(m.rootId) ?? []));
+  const pre = scene.nodes.map((n) => ({ n, box: aabbOf(nodeCorners(n)) }));
+  const bad: string[] = [];
   for (const e of scene.edges) {
     const nums = e.d.match(/-?\d+(\.\d+)?(e[+-]?\d+)?/gi)!.map(Number);
     expect(nums).toHaveLength(8); // M x y C x1 y1 x2 y2 x y
@@ -101,12 +121,16 @@ function assertNoConnectorIntrusion(m: FamilyModel, scene: PrintScene): void {
       const t = s / 64, u = 1 - t;
       const px = u * u * u * P[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * T[0];
       const py = u * u * u * P[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * T[1];
-      for (const n of scene.nodes) {
-        if (skip.has(n.personId)) continue;
-        expect(insideNode(n, px, py), `edge ${e.fromId}→${e.toId} enters ${n.personId} at t=${t.toFixed(3)}`).toBe(false);
+      for (const q of pre) {
+        // AABB prefilter first — it rejects ~all of the 2.6M samples cheaply; the exact
+        // insideNode check (unchanged semantics) runs only on the survivors.
+        if (px < q.box.minX || px > q.box.maxX || py < q.box.minY || py > q.box.maxY) continue;
+        if (skip.has(q.n.personId)) continue;
+        if (insideNode(q.n, px, py)) bad.push(`edge ${e.fromId}→${e.toId} enters ${q.n.personId} at t=${t.toFixed(3)}`);
       }
     }
   }
+  expect(bad).toEqual([]);
 }
 
 describe('fanLayout — hub and rings', () => {
@@ -296,7 +320,7 @@ describe('fanLayout — collision and bounds invariants', () => {
     expect(scene.nodes.length).toBeGreaterThanOrEqual(200);
     assertNoOBBOverlap(scene);
     assertNoConnectorIntrusion(m, scene);
-  }, 30000);
+  }, 90000);
 
   it('>200-person single-ring overflow: Σ content need still exceeds π even at maxDelta — the honest response is a huge ring, never a silent collapse to base radius (zero OBB overlaps either way)', () => {
     // 500 direct leaf children of the root couple, each with a 30-char name —
@@ -315,7 +339,7 @@ describe('fanLayout — collision and bounds invariants', () => {
     // δ must stay at its (necessarily large) solved value, not collapse to 0.
     expect(geo.ringInnerMm[1]).toBeGreaterThan(1000);
     assertNoOBBOverlap(fanLayout(m, measure));
-  }, 30000);
+  }, 90000);
 
   it.each([2, 5, 20, 50])('a couple with a long name (nameLen≈60, T well under the ~100mm safe bound) still avoids overlap/intrusion at fanout=%i', (fanout) => {
     // Pins the SAFE side of the F1 approximation's real limiting variable —
