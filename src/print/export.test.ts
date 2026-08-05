@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildExportSvg, collectFontCss, downloadSvg, exportFilename } from './export';
+import { buildExportSvg, buildPanelExportSvg, collectFontCss, downloadSvg, exportFilename, exportPanelFilename } from './export';
 import { THEMES } from './themes';
 
 function liveSvg(): SVGSVGElement {
@@ -73,5 +73,53 @@ describe('downloadSvg', () => {
     createObjectURL.mockRestore();
     revokeObjectURL.mockRestore();
     clickSpy.mockRestore();
+  });
+});
+
+describe('per-panel export (PR ③)', () => {
+  const PANELS_SVG = `
+    <svg class="print-canvas-svg" data-arrangement="panels" viewBox="0 0 244 96">
+      <style>.pn-name{fill:#111;}</style>
+      <rect data-print-role="background" width="244" height="96" fill="#eee"/>
+      <g class="print-panel" data-panel-label="master" data-panel-w="100" data-panel-h="86">
+        <g data-print-role="guide"><rect width="10" height="10"/></g>
+        <g class="person-node" role="button" tabindex="0" data-person-id="a"><text class="pn-name">A</text></g>
+      </g>
+      <g class="print-panel" data-panel-label="II" data-panel-w="120" data-panel-h="96" transform="translate(124 0)">
+        <g class="person-node" role="button" tabindex="0" data-person-id="g"><text class="pn-name">G</text></g>
+      </g>
+    </svg>`;
+  const host = () => {
+    document.body.innerHTML = PANELS_SVG;
+    return document.querySelector<SVGSVGElement>('svg.print-canvas-svg')!;
+  };
+
+  it('extracts exactly one panel, strips its composition offset, and produces an mm-true page', () => {
+    const out = buildPanelExportSvg(host(), 'II', { wMm: 1200, hMm: 600, fontCss: '', background: '#eee' });
+    expect(out).toContain('width="1200mm"');
+    expect(out).toContain('height="600mm"');
+    expect(out).toContain('data-person-id="g"');
+    expect(out).not.toContain('data-person-id="a"');           // the other panel stays out
+    expect(out).not.toContain('translate(124 0)');             // composition offset is screen-only
+    expect(out).toContain('.pn-name{fill:#111;}');             // scene style rides along
+    expect(out).toContain('h 100');                            // calibration bar per page
+    expect(out).not.toContain('tabindex');                     // interactivity stripped by buildExportSvg
+  });
+
+  it('removes per-panel guides and is deterministic', () => {
+    const a = buildPanelExportSvg(host(), 'master', { wMm: 1200, hMm: 600, fontCss: '', background: '#eee' });
+    const b = buildPanelExportSvg(host(), 'master', { wMm: 1200, hMm: 600, fontCss: '', background: '#eee' });
+    expect(a).toBe(b);
+    expect(a).not.toContain('data-print-role="guide"');
+  });
+
+  it('throws loudly on an unknown panel label (never a silent empty page)', () => {
+    expect(() => buildPanelExportSvg(host(), 'IX', { wMm: 1200, hMm: 600, fontCss: '', background: '#eee' }))
+      .toThrow(/no panel labeled "IX"/);
+  });
+
+  it('exportPanelFilename carries n-of-N and cm dimensions', () => {
+    expect(exportPanelFilename('Nhà Nội', 'botanical', 2, 3, 400, 600))
+      .toBe('Nhà Nội-panels-botanical-2of3-40x60cm.svg');
   });
 });
