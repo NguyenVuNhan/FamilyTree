@@ -22,6 +22,11 @@ export interface PrintPanel {
   /** Full panel box including its title strip. */
   wMm: number;
   hMm: number;
+  /** Carried from PanelPlan.overCap: narrowing bottomed out at F0–F1 (W=1) and this
+   *  panel's rendered occupancy still exceeds PANEL_SOFT_CAP (see panels-partition.ts).
+   *  Lets a downstream consumer (checkPanelsFit) turn it into an honest refusal
+   *  instead of silently emitting an unbounded panel. */
+  overCap: boolean;
 }
 
 export interface PrintPanels {
@@ -29,6 +34,8 @@ export interface PrintPanels {
   panels: PrintPanel[];
   wMm: number;
   hMm: number;
+  /** True when ANY panel is overCap — the composition-level signal checkPanelsFit acts on. */
+  overCap: boolean;
 }
 
 export function panelsLayout(model: FamilyModel, measure: PrintMeasurer): PrintPanels {
@@ -47,6 +54,7 @@ export function panelsLayout(model: FamilyModel, measure: PrintMeasurer): PrintP
       xMm: x,
       wMm: scene.wMm,
       hMm: scene.hMm + TITLE_BLOCK_MM,
+      overCap: p.overCap,
     };
     x += panel.wMm + PANEL_GAP_MM;
     return panel;
@@ -56,6 +64,7 @@ export function panelsLayout(model: FamilyModel, measure: PrintMeasurer): PrintP
     panels,
     wMm: x - PANEL_GAP_MM,
     hMm: Math.max(...panels.map((p) => p.hMm)),
+    overCap: panels.some((p) => p.overCap),
   };
 }
 
