@@ -4,14 +4,22 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 import { REGISTRY_STORAGE_KEY } from '../config/registry';
-import { collectFontCss } from '../print/export';
+import { buildPanelExportSvg, collectFontCss, downloadSvg } from '../print/export';
 
-// Only collectFontCss is overridden (wrapped in a spy that still calls through by
-// default) — this lets one test (Finding 3: export failure path) force a rejection
-// via mockRejectedValueOnce without touching buildExportSvg/downloadSvg/exportFilename.
+// collectFontCss and buildPanelExportSvg are spies that still call through by
+// default — collectFontCss lets one test (export failure path) force a rejection
+// via mockRejectedValueOnce; buildPanelExportSvg lets the panels-export test
+// inspect its per-call label argument (Fix round 1, Important finding 3). downloadSvg
+// is a bare no-op — jsdom has no URL.createObjectURL, and no test needs a real
+// download, only the filenames it was called with.
 vi.mock('../print/export', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../print/export')>();
-  return { ...actual, collectFontCss: vi.fn(actual.collectFontCss) };
+  return {
+    ...actual,
+    collectFontCss: vi.fn(actual.collectFontCss),
+    buildPanelExportSvg: vi.fn(actual.buildPanelExportSvg),
+    downloadSvg: vi.fn(),
+  };
 });
 
 const DEMO_CSV = 'Đời 1,Đời 2,Image\nMa Ellis + Pa Ellis,,\n,Kid Ellis,';
@@ -399,5 +407,25 @@ describe('panels arrangement (UC-77/85/89, PR ③)', () => {
     expect(refusal.textContent).toContain('triptych');
     expect(refusal.textContent).toContain('1'); // this family is a single master panel
     expect(screen.getByRole('button', { name: 'Export SVG' })).toBeDisabled();
+  });
+
+  it('export click downloads exactly one SVG per panel, numbered n-of-N, master panel first (Fix round 1)', async () => {
+    csvFetch(DEEP_CSV);
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:panels')}`);
+    render(<App />);
+    await screen.findAllByRole('button', { name: /Ông Tổ/ });
+    // The stubbed fetch above only serves CSV text — collectFontCss's real
+    // implementation would choke fetching binary font files through it, so bypass
+    // font embedding for this test the same way the export-failure test bypasses it.
+    vi.mocked(collectFontCss).mockResolvedValueOnce('');
+    await userEvent.click(screen.getByRole('button', { name: 'Export SVG' }));
+    await waitFor(() => expect(downloadSvg).toHaveBeenCalledTimes(2));
+    const filenames = vi.mocked(downloadSvg).mock.calls.map(([, filename]) => filename);
+    expect(filenames[0]).toContain('-1of2-');
+    expect(filenames[1]).toContain('-2of2-');
+    // buildPanelExportSvg's 2nd arg is the panel label it extracts — the first
+    // downloaded file must be the master panel, not sub-panel I.
+    expect(vi.mocked(buildPanelExportSvg).mock.calls[0][1]).toBe('master');
+    expect(vi.mocked(buildPanelExportSvg).mock.calls[1][1]).toBe('I');
   });
 });

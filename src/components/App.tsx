@@ -131,10 +131,20 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
   const active = useMemo((): ActiveScene | null => {
     if (data.status !== 'ready') return null;
     switch (settings.arrangement) {
+      case 'topDown': return null;
       case 'flow': return { kind: 'single', arrangement: 'flow', scene: flowLayout(data.model, printMeasure) };
       case 'fan': return { kind: 'single', arrangement: 'fan', scene: fanLayout(data.model, printMeasure) };
       case 'panels': return { kind: 'panels', composition: panelsLayout(data.model, printMeasure) };
-      default: return null;
+      default: {
+        // Exhaustiveness guard (Fix round 1, Important finding 2): this repo's eslint
+        // config has no switch-exhaustiveness rule, so widening Arrangement (PR ④'s
+        // 'stacks') without adding a case above would otherwise fall through here
+        // silently. Assigning to `never` fails tsc (npm run lint runs tsc -b) the
+        // moment the union grows past the cases handled above.
+        const _exhaustive: never = settings.arrangement;
+        void _exhaustive;
+        return null;
+      }
     }
   }, [data, printMeasure, settings.arrangement]);
 
@@ -149,8 +159,20 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
       : data.warnings;
   }, [data, layout]);
 
+  // CSS (styles/index.css) keys the print-only sheet visibility off
+  // body[data-print-arrangement] — set it exactly when a print scene exists, so
+  // print CSS can never hide the app while nothing would print (blank-page guard).
+  const isPrint = active !== null;
+
+  // topDown's own print path (no print scene — the on-screen cards ARE the print
+  // output, scaled to fit). Keyed off `isPrint` (scene-based), not the arrangement
+  // string directly: a future arrangement with no engine branch renders topDown
+  // cards (active === null → isPrint false) and must ALSO get this scale hook, or
+  // Ctrl+P would print an oversized, clipped tree instead of the fitted page
+  // (Fix round 1, Important finding 1 — provably identical for today's four values,
+  // since isPrint is exactly `settings.arrangement !== 'topDown'` whenever data is ready).
   useEffect(() => {
-    if (!layout || settings.arrangement !== 'topDown') return;
+    if (!layout || isPrint) return;
     const onBeforePrint = () => {
       document.documentElement.style.setProperty(
         '--print-scale', String(Math.min(1, 1000 / layout.width, 660 / layout.height)),
@@ -158,12 +180,8 @@ function FamilyApp({ source, linkSettings }: { source: ResolvedSource; linkSetti
     };
     window.addEventListener('beforeprint', onBeforePrint);
     return () => window.removeEventListener('beforeprint', onBeforePrint);
-  }, [layout, settings.arrangement]);
+  }, [layout, isPrint]);
 
-  // CSS (styles/index.css) keys the print-only sheet visibility off
-  // body[data-print-arrangement] — set it exactly when a print scene exists, so
-  // print CSS can never hide the app while nothing would print (blank-page guard).
-  const isPrint = active !== null;
   useEffect(() => {
     if (!isPrint) return;
     document.body.dataset.printArrangement = settings.arrangement;
