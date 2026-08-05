@@ -58,7 +58,8 @@ describe('exportFilename', () => {
 });
 
 describe('downloadSvg', () => {
-  it('creates a Blob URL, clicks a synthetic anchor, then revokes the URL', () => {
+  it('creates a Blob URL, clicks a synthetic anchor, then revokes the URL only after a grace period', () => {
+    vi.useFakeTimers();
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url');
     const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -68,11 +69,16 @@ describe('downloadSvg', () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(createObjectURL.mock.calls[0][0]).toBeInstanceOf(Blob);
     expect(clickSpy).toHaveBeenCalledTimes(1);
+    // Synchronous revocation races the async download read (CI shipped 2 of 8
+    // panel files) — the URL must still be alive immediately after the click.
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    vi.runAllTimers();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
 
     createObjectURL.mockRestore();
     revokeObjectURL.mockRestore();
     clickSpy.mockRestore();
+    vi.useRealTimers();
   });
 });
 

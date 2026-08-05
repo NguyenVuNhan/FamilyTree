@@ -110,6 +110,14 @@ test('E2E-86: worst-200 refuses panels at pano (names the panel), then exports a
     expect(mmPerUnit, name).toBeCloseTo(1, 5);
     expect(svg.replace(/\bxmlns(:\w+)?="[^"]*"/g, ''), name).not.toMatch(/https?:\/\//); // self-contained per file
   }
+  // Reload before the determinism re-export: Chrome's per-tab download limiter
+  // caps an IMMEDIATE second burst of automatic downloads at ~2 files (probe-
+  // verified: back-to-back click → 2/8 delivered; after reload → 8/8; 20s apart
+  // → 8/8). Navigation resets the limiter, and byte-identical output across two
+  // page loads is a strictly stronger determinism statement anyway.
+  await page.reload();
+  await expect(page.locator('svg.print-canvas-svg[data-arrangement="panels"]')).toBeVisible();
+  await expect(page.getByTestId('fit-refusal')).toHaveCount(0);
   const second = await exportSvgs(page, n);
   expect(second).toEqual(files); // byte-identical per panel: deterministic export
 });

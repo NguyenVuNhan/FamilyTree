@@ -134,5 +134,9 @@ export function downloadSvg(markup: string, filename: string): void {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  // Revoking synchronously races the download: the browser reads the blob URL
+  // asynchronously after the click, and on a slow machine the revoke wins — the
+  // panels export (8 clicks in one pass) shipped only 2 of 8 files on CI. Defer
+  // long enough for any download to begin; the blob itself is tiny and one-shot.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
