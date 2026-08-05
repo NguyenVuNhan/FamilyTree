@@ -114,6 +114,10 @@ export function themeCss(t: ThemeTokens): string {
     `.pn-name-title{font-family:${t.titleFamily};font-weight:${titleWeight};fill:${t.text};}`, // F0/F1 names use the title face (spec: serif for title + F0/F1)
     `.pn-years{font-family:${t.nameFamily};font-weight:${nameWeight};fill:${t.text};opacity:0.75;}`,
     `.connector{stroke:${t.connector};fill:none;stroke-width:0.35;}`,
+    `.pp-frame{stroke:${t.accent};fill:none;}`,
+    `.pt-subtitle{font-family:${t.nameFamily};font-weight:${nameWeight};fill:${t.accent};opacity:0.8;}`,
+    `.pm-chip{fill:${t.nodeFill};stroke:${t.accent};stroke-width:0.5;}`,
+    `.pm-label{font-family:${t.titleFamily};font-weight:${titleWeight};fill:${t.accent};}`,
     `.pt-guide{stroke:${t.accent};fill:none;stroke-dasharray:4 3;opacity:0.5;}`,
   ].join('\n');
 }

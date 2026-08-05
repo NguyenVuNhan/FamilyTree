@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { expect, type Download, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,25 @@ export async function exportSvg(page: Page): Promise<string> {
   const path = await download.path();
   if (!path) throw new Error('download.path() returned null — was acceptDownloads disabled?');
   return readFileSync(path, 'utf-8');
+}
+
+/** Clicks Export SVG once and collects `expected` downloads (the panels
+ *  arrangement produces one file per panel from a single click). Returns
+ *  filename+content pairs sorted by filename — the `<n>of<N>` component makes
+ *  that a deterministic panel order. */
+export async function exportSvgs(page: Page, expected: number): Promise<{ name: string; svg: string }[]> {
+  const downloads: Download[] = [];
+  const listener = (d: Download) => { downloads.push(d); };
+  page.on('download', listener);
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  await expect.poll(() => downloads.length, { timeout: 15_000 }).toBe(expected);
+  page.off('download', listener);
+  const files = await Promise.all(downloads.map(async (d) => {
+    const path = await d.path();
+    if (!path) throw new Error('download.path() returned null — was acceptDownloads disabled?');
+    return { name: d.suggestedFilename(), svg: readFileSync(path, 'utf-8') };
+  }));
+  return files.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Migration shim for pre-dynamic specs: what `goto('/?family=alpha')` used to do. */

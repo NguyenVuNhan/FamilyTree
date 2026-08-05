@@ -107,3 +107,31 @@ describe('fan arrangement + aspect hint (PR ②)', () => {
     expect(screen.getByTestId('aspect-hint')).toHaveTextContent('Scroll reads best on a wide format');
   });
 });
+
+describe('panels arrangement + triptych gating (PR ③)', () => {
+  const panels = { ...DEFAULT_SETTINGS, arrangement: 'panels' as const };
+  it('Panels option exists and gates card controls exactly like flow/fan', () => {
+    render(<SettingsPanel settings={panels} onChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Panels' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('group', { name: 'Card style' }).querySelector('button')).toBeDisabled();
+    expect(screen.getByRole('group', { name: 'Theme' })).toBeInTheDocument();
+  });
+  it('Triptych is offered only for panels', () => {
+    const { rerender } = render(<SettingsPanel settings={panels} onChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Triptych' })).toBeInTheDocument();
+    rerender(<SettingsPanel settings={{ ...DEFAULT_SETTINGS, arrangement: 'flow' }} onChange={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Triptych' })).toBeNull();
+  });
+  it('leaving panels while trip is selected resets the format in the same change (no dead setting)', () => {
+    const onChange = vi.fn();
+    render(<SettingsPanel settings={{ ...panels, format: 'trip' }} onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Fan' }));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ arrangement: 'fan', format: DEFAULT_SETTINGS.format }),
+    );
+  });
+  it('panels shows no aspect hint (decomposition absorbs any format)', () => {
+    render(<SettingsPanel settings={{ ...panels, format: 'square' }} onChange={() => {}} />);
+    expect(screen.queryByTestId('aspect-hint')).toBeNull();
+  });
+});

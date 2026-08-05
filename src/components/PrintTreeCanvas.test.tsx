@@ -97,3 +97,30 @@ describe('fan rendering (PR ②)', () => {
     expect(titleY).toBeLessThan(30); // top strip, as before
   });
 });
+
+describe('marker chips (PR ③)', () => {
+  const chipScene: PrintScene = {
+    nodes: [
+      { personId: 'r2', xMm: 10, yMm: 10, wMm: 40, hMm: 12, generation: 0, nameLines: ['Root'], years: null, fontMm: 12, titleFace: true },
+      { personId: 'm:II', xMm: 70, yMm: 12, wMm: 15, hMm: 9, generation: 1, nameLines: ['II'], years: null, fontMm: 10.2, titleFace: true },
+    ],
+    edges: [{ d: 'M 50 16 C 55 16 65 16 70 16', fromId: 'u:x', toId: 'm:II' }],
+    wMm: 100, hMm: 40,
+  };
+  it('m:-prefixed nodes render as non-interactive continuation chips, not person nodes', () => {
+    const { container } = render(
+      <PrintTreeCanvas scene={chipScene} theme={THEMES.botanical} title="T" guide={null}
+        expandedId={null} onToggle={() => {}} />,
+    );
+    const chip = container.querySelector('g.print-marker')!;
+    expect(chip.getAttribute('data-marker')).toBe('II');
+    expect(chip.getAttribute('data-marker-side')).toBe('out');
+    expect(chip.getAttribute('role')).toBeNull();          // not a button
+    expect(chip.getAttribute('tabindex')).toBeNull();      // not focusable
+    expect(chip.querySelector('rect.pm-chip')).not.toBeNull();
+    expect(chip.querySelector('text.pm-label')!.textContent).toBe('II');
+    expect(container.querySelectorAll('g.person-node')).toHaveLength(1); // only the real person
+    // the replacement connector still carries the pairing hooks
+    expect(container.querySelector('path.connector[data-to="m:II"]')).not.toBeNull();
+  });
+});

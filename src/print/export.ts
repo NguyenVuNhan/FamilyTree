@@ -97,6 +97,36 @@ export function exportFilename(family: string, arrangement: string, theme: strin
   return `${family}-${arrangement}-${theme}-${Math.round(wMm / 10)}x${Math.round(hMm / 10)}cm.svg`;
 }
 
+/** One panel of the panels arrangement → one self-contained mm-true SVG page.
+ *  Extracts the `g.print-panel` with the given label from a clone of the live
+ *  canvas, strips its side-by-side composition offset, wraps it in a temp <svg>
+ *  whose viewBox is the panel's own physical box, and delegates to the
+ *  unchanged buildExportSvg — fonts, background, calibration bar, trim marks
+ *  and centering are byte-identical to a single-scene export. */
+export function buildPanelExportSvg(svgEl: SVGSVGElement, panelLabel: string, opts: {
+  wMm: number; hMm: number; fontCss: string; background: string;
+}): string {
+  const clone = svgEl.cloneNode(true) as SVGSVGElement;
+  const panel = clone.querySelector(`g.print-panel[data-panel-label="${panelLabel}"]`);
+  if (!panel) throw new Error(`buildPanelExportSvg: no panel labeled "${panelLabel}" in the canvas SVG`);
+  const pw = Number(panel.getAttribute('data-panel-w'));
+  const ph = Number(panel.getAttribute('data-panel-h'));
+  if (!(pw > 0) || !(ph > 0)) throw new Error(`buildPanelExportSvg: panel "${panelLabel}" is missing data-panel-w/h`);
+  const temp = document.createElementNS(SVG_NS, 'svg') as SVGSVGElement;
+  temp.setAttribute('viewBox', `0 0 ${pw} ${ph}`);
+  const style = document.createElementNS(SVG_NS, 'style');
+  style.textContent = clone.querySelector('style')?.textContent ?? '';
+  temp.appendChild(style);
+  panel.removeAttribute('transform'); // composition offset is screen-only
+  temp.appendChild(panel);
+  return buildExportSvg(temp, opts);
+}
+
+/** `<family>-panels-<theme>-<n>of<N>-<W>x<H>cm.svg`, dimensions in cm rounded from mm. */
+export function exportPanelFilename(family: string, theme: string, n: number, total: number, wMm: number, hMm: number): string {
+  return `${family}-panels-${theme}-${n}of${total}-${Math.round(wMm / 10)}x${Math.round(hMm / 10)}cm.svg`;
+}
+
 /** Triggers a browser download of the serialized markup via a Blob URL + synthetic anchor click. */
 export function downloadSvg(markup: string, filename: string): void {
   const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml' }));
@@ -104,5 +134,9 @@ export function downloadSvg(markup: string, filename: string): void {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  // Revoking synchronously races the download: the browser reads the blob URL
+  // asynchronously after the click, and on a slow machine the revoke wins — the
+  // panels export (8 clicks in one pass) shipped only 2 of 8 files on CI. Defer
+  // long enough for any download to begin; the blob itself is tiny and one-shot.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

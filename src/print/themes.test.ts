@@ -60,3 +60,20 @@ describe('themeCss', () => {
     expect(css).toMatch(new RegExp(`\\.pn-years\\{[^}]*font-weight:${nameWeight};`));
   });
 });
+
+describe('panel + marker theme classes (PR ③)', () => {
+  it('themeCss emits frame, subtitle and chip classes wired to the theme tokens', () => {
+    for (const t of Object.values(THEMES)) {
+      const css = themeCss(t);
+      expect(css).toContain(`.pp-frame{stroke:${t.accent};fill:none;}`);
+      expect(css).toContain(`.pm-chip{fill:${t.nodeFill};stroke:${t.accent};stroke-width:0.5;}`);
+      expect(css).toContain(`.pm-label{font-family:${t.titleFamily};`);
+      expect(css).toContain(`.pt-subtitle{font-family:${t.nameFamily};`);
+    }
+  });
+  it('chip label (accent on nodeFill) keeps ≥ 2:1 contrast — wayfinding furniture, names stay in text color', () => {
+    for (const t of Object.values(THEMES)) {
+      expect(contrastRatio(t.accent, t.nodeFill), t.id).toBeGreaterThanOrEqual(2);
+    }
+  });
+});

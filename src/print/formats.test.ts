@@ -26,3 +26,10 @@ describe('formats', () => {
     expect(PRINT_BOUNDS.customMm).toEqual({ min: 300, maxW: 2000, maxH: 1200 });
   });
 });
+
+describe('triptych preset (PR ③)', () => {
+  it('trip is a real preset at pano-third portrait dimensions', () => {
+    expect(FORMAT_PRESETS.trip).toMatchObject({ wMm: 400, hMm: 600 });
+    expect(formatSizeMm({ format: 'trip', customWmm: 1200, customHmm: 600 })).toEqual({ wMm: 400, hMm: 600 });
+  });
+});

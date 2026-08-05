@@ -96,3 +96,20 @@ describe('fan arrangement (PR ②)', () => {
     expect(printControlsActive({ ...DEFAULT_SETTINGS, arrangement: 'fan' })).toBe(true);
   });
 });
+
+describe('panels arrangement + trip cross-field (PR ③)', () => {
+  it('sanitize accepts panels; junk still falls back', () => {
+    expect(sanitizeSettings({ arrangement: 'panels' }).arrangement).toBe('panels');
+    expect(sanitizeSettings({ arrangement: 'panel' }).arrangement).toBe('topDown');
+  });
+  it('printControlsActive is true for panels', () => {
+    expect(printControlsActive({ ...DEFAULT_SETTINGS, arrangement: 'panels' })).toBe(true);
+  });
+  it('trip survives only with panels; any other arrangement degrades it to the default format per-field', () => {
+    expect(sanitizeSettings({ arrangement: 'panels', format: 'trip' }).format).toBe('trip');
+    expect(sanitizeSettings({ arrangement: 'flow', format: 'trip' }).format).toBe(DEFAULT_SETTINGS.format);
+    expect(sanitizeSettings({ format: 'trip' }).format).toBe(DEFAULT_SETTINGS.format); // topDown default
+    // the degrade never touches the arrangement itself
+    expect(sanitizeSettings({ arrangement: 'flow', format: 'trip' }).arrangement).toBe('flow');
+  });
+});

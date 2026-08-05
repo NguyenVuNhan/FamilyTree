@@ -150,12 +150,31 @@ export async function collide(page: Page, svg: string): Promise<Collision[]> {
     const root = document.querySelector('svg');
     if (!root) throw new Error('collide: no <svg> in the provided markup');
 
-    interface TRect { id: string; inv: DOMMatrix; x1: number; y1: number; x2: number; y2: number }
+    interface TRect { id: string; label: string; inv: DOMMatrix; x1: number; y1: number; x2: number; y2: number }
     const rects: TRect[] = [];
+    // Owner lookup is broadened to marker chips (panels arrangement's continuation
+    // chips, `g.print-marker[data-marker]`) as well as person nodes — a text run
+    // with no owning [data-person-id] used to be silently skipped here, making
+    // marker labels invisible to the collision gate. `id` matches the connector's
+    // raw data-from/data-to values (marker persons are "m:<label>" in the scene
+    // graph — see PrintSceneGroup.tsx), so self-touch exclusion still works;
+    // `label` is the human-readable form ("marker:II") used only in failure output.
     for (const text of Array.from(root.querySelectorAll('text'))) {
-      const owner = text.closest('[data-person-id]') as HTMLElement | SVGElement | null;
-      const id = owner?.getAttribute('data-person-id');
-      if (!id) continue;
+      const owner = text.closest('[data-person-id], [data-marker]') as HTMLElement | SVGElement | null;
+      if (!owner) continue;
+      const personId = owner.getAttribute('data-person-id');
+      const marker = owner.getAttribute('data-marker');
+      let id: string;
+      let label: string;
+      if (personId) {
+        id = personId;
+        label = personId;
+      } else if (marker) {
+        id = `m:${marker}`;
+        label = `marker:${marker}`;
+      } else {
+        continue;
+      }
       const g = text as unknown as SVGGraphicsElement;
       let bbox: DOMRect;
       try { bbox = g.getBBox(); } catch { continue; }
@@ -163,7 +182,7 @@ export async function collide(page: Page, svg: string): Promise<Collision[]> {
       // Local rect + inverse matrix: samples are tested in the text's own frame,
       // where the strokeWidth/2 + 1mm inflation is exact even under rotation.
       rects.push({
-        id, inv: localMatrix(root, g).inverse(),
+        id, label, inv: localMatrix(root, g).inverse(),
         x1: bbox.x, y1: bbox.y, x2: bbox.x + bbox.width, y2: bbox.y + bbox.height,
       });
     }
@@ -189,7 +208,7 @@ export async function collide(page: Page, svg: string): Promise<Collision[]> {
           if (fromPartners.includes(r.id) || r.id === to) continue;
           const lp = r.inv.transformPoint(abs);
           if (lp.x >= r.x1 - inflate && lp.x <= r.x2 + inflate && lp.y >= r.y1 - inflate && lp.y <= r.y2 + inflate) {
-            hits.push({ from, to, hit: r.id, x: abs.x, y: abs.y });
+            hits.push({ from, to, hit: r.label, x: abs.x, y: abs.y });
           }
         }
       }

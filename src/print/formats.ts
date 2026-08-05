@@ -1,4 +1,4 @@
-export type FormatId = 'a4' | 'a3' | 'a1' | 'a0' | 'pano' | 'square' | 'custom';
+export type FormatId = 'a4' | 'a3' | 'a1' | 'a0' | 'pano' | 'square' | 'trip' | 'custom';
 
 export const FORMAT_PRESETS: Record<Exclude<FormatId, 'custom'>, { wMm: number; hMm: number; label: string }> = {
   a4: { wMm: 297, hMm: 210, label: 'A4 landscape' },
@@ -7,6 +7,8 @@ export const FORMAT_PRESETS: Record<Exclude<FormatId, 'custom'>, { wMm: number; 
   a0: { wMm: 1189, hMm: 841, label: 'A0 landscape' },
   pano: { wMm: 1200, hMm: 600, label: 'Panorama 120×60 cm' },
   square: { wMm: 900, hMm: 900, label: 'Square 90×90 cm' },
+  // Portrait thirds of the panorama — a page/frame PER PANEL, panels-only (D6/D7).
+  trip: { wMm: 400, hMm: 600, label: 'Triptych 3 × 40×60 cm' },
 };
 
 export const PRINT_BOUNDS = {
