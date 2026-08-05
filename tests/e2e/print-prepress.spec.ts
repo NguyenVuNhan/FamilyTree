@@ -1,7 +1,10 @@
 // tests/e2e/print-prepress.spec.ts
 import { expect, test } from '@playwright/test';
 import { collide, contentBBox, fontSizesMm, parseDims } from './helpers/svg-mm';
-import { exportSvg, FIXTURE_SERVER, viewUrl } from './helpers';
+import { exportSvg, exportSvgs, FIXTURE_SERVER, viewUrl } from './helpers';
+// formats.ts is plain data (no *.woff2?url asset imports, unlike themes.ts — see the
+// THEME_TOKENS note in print-arrangements.spec.ts), so it's safe to import directly here.
+import { FORMAT_PRESETS } from '../../src/print/formats';
 
 // stair-worst-200.csv is deliberately unfittable at every format the app supports (see
 // worst-case-generator.ts's generateDense() doc comment for the measured numbers) — its
@@ -15,10 +18,25 @@ const STANDARD = `${FIXTURE_SERVER}/standard.csv`;
 // stair-dense-35 drives BOTH arrangements: its deepest content sits at ring 3,
 // so the fan fits panorama at a 60mm margin with ~30mm radial slack (see the
 // PR ② plan's capacity table); worst-200 stays refusal/perf-only, as in PR ①.
+// panels on stair-dense-35 partitions into exactly 2 panels (empirically verified against
+// the current partitioner: the master hub — 7 real people plus 1 continuation marker chip
+// for the single cut union — and continuation panel "I", which renders the whole
+// 29-person dense branch in one piece via the tiny-branch fallback, since none of its own
+// gen-1 frontier subtrees individually reach MAJOR_BRANCH_MIN and so none of them can be
+// cut further, i.e. that branch is not overCap either). Every exported panel file must
+// independently pass the same pre-press bars as the flow/fan legs above — BUT panel I's
+// 29 people all sit at one shallow generation (a wide sibling group that flow-layout wraps
+// into several rows), which is tall enough that it needs ~65cm at a 60mm margin —
+// empirically confirmed to overflow pano's fixed 60cm height (a pure dimensional refusal,
+// not an overCap one; see src/print/fit.ts's checkPanelsFit). Panorama was sized for the
+// flow/fan legs' single-tree layout, not for a lone wide branch panel, so the panels leg
+// runs at A0 instead — same fixture, same partition, same pre-press bars, a format that
+// actually has the headroom (analogous to E2E-86's pano→A0 fix for worst-200).
 const ARRANGEMENTS = [
   { arr: 'flow', fmt: 'pano' },
   { arr: 'fan', fmt: 'pano' },
-]; // PR ③ appends panels, PR ④ stacks
+  { arr: 'panels', fmt: 'a0' },
+] as const; // PR ④ appends stacks
 
 // See tests/e2e/print-arrangements.spec.ts for the shared note on why THEMES can't be
 // imported here (themes.ts pulls in Vite-only *.woff2?url asset imports that Node's
@@ -32,32 +50,49 @@ for (const { arr, fmt } of ARRANGEMENTS) {
   test(`E2E-68: legibility floor at 1:1 — ${arr} (UC-74, UC-89)`, async ({ page }) => {
     await page.goto(viewUrl(DENSE, `arr:${arr},fmt:${fmt}`, 'W'));
     await expect(page.locator('g.person-node').first()).toBeVisible();
-    const svg = await exportSvg(page);
-    const { mmPerUnit } = parseDims(svg);
-    for (const { id, mm } of await fontSizesMm(page, svg, 'text.pn-name, text.pn-name-title')) {
-      expect(mm * mmPerUnit, `name of ${id}`).toBeGreaterThanOrEqual(6.5);
-    }
-    for (const { id, mm } of await fontSizesMm(page, svg, 'text.pn-years')) {
-      expect(mm * mmPerUnit, `years of ${id}`).toBeGreaterThanOrEqual(3.2);
+    const svgs = arr === 'panels'
+      ? (await exportSvgs(page, await page.locator('g.print-panel').count())).map((f) => f.svg)
+      : [await exportSvg(page)];
+    for (const svg of svgs) {
+      const { mmPerUnit } = parseDims(svg);
+      for (const { id, mm } of await fontSizesMm(page, svg, 'text.pn-name, text.pn-name-title')) {
+        expect(mm * mmPerUnit, `name of ${id}`).toBeGreaterThanOrEqual(6.5);
+      }
+      for (const { id, mm } of await fontSizesMm(page, svg, 'text.pn-years')) {
+        expect(mm * mmPerUnit, `years of ${id}`).toBeGreaterThanOrEqual(3.2);
+      }
     }
   });
 
   test(`E2E-69: connector/text collision — ${arr} (UC-74)`, async ({ page }) => {
     await page.goto(viewUrl(DENSE, `arr:${arr},fmt:${fmt}`, 'W'));
-    const svg = await exportSvg(page);
-    expect(await collide(page, svg)).toEqual([]);
+    await expect(page.locator('g.person-node').first()).toBeVisible();
+    const svgs = arr === 'panels'
+      ? (await exportSvgs(page, await page.locator('g.print-panel').count())).map((f) => f.svg)
+      : [await exportSvg(page)];
+    for (const svg of svgs) {
+      expect(await collide(page, svg)).toEqual([]);
+    }
   });
 
   test(`E2E-70: safe margin + physical dims — ${arr} (UC-75)`, async ({ page }) => {
     await page.goto(viewUrl(DENSE, `arr:${arr},fmt:${fmt},mgn:60`, 'W'));
-    const svg = await exportSvg(page);
-    const { wMm, hMm, mmPerUnit } = parseDims(svg);
-    expect([wMm, hMm]).toEqual([1200, 600]);
-    const box = await contentBBox(page, svg);
-    expect(box.x * mmPerUnit).toBeGreaterThanOrEqual(60);
-    expect((box.x + box.width) * mmPerUnit).toBeLessThanOrEqual(1200 - 60);
-    expect(box.y * mmPerUnit).toBeGreaterThanOrEqual(60);
-    expect((box.y + box.height) * mmPerUnit).toBeLessThanOrEqual(600 - 60);
+    await expect(page.locator('g.person-node').first()).toBeVisible();
+    const svgs = arr === 'panels'
+      ? (await exportSvgs(page, await page.locator('g.print-panel').count())).map((f) => f.svg)
+      : [await exportSvg(page)];
+    // Expected physical size follows `fmt` (pano for flow/fan, A0 for panels — see the
+    // ARRANGEMENTS comment above) rather than a hardcoded pano literal.
+    const { wMm: fmtWmm, hMm: fmtHmm } = FORMAT_PRESETS[fmt];
+    for (const svg of svgs) {
+      const { wMm, hMm, mmPerUnit } = parseDims(svg);
+      expect([wMm, hMm]).toEqual([fmtWmm, fmtHmm]);
+      const box = await contentBBox(page, svg);
+      expect(box.x * mmPerUnit).toBeGreaterThanOrEqual(60);
+      expect((box.x + box.width) * mmPerUnit).toBeLessThanOrEqual(fmtWmm - 60);
+      expect(box.y * mmPerUnit).toBeGreaterThanOrEqual(60);
+      expect((box.y + box.height) * mmPerUnit).toBeLessThanOrEqual(fmtHmm - 60);
+    }
   });
 }
 

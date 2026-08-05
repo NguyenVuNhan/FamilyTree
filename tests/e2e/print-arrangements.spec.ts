@@ -224,7 +224,63 @@ test('E2E-83: fan aspect hint on a square format is soft — visible, never bloc
   await expect(page.getByTestId('aspect-hint')).toHaveCount(0);
 });
 
-for (const arr of ['flow', 'fan'] as const) {
+test('E2E-85: panels — master F0–F2 overview with exactly paired continuation markers on worst-200 (UC-77, UC-85)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  // Default pano format: worst-200's deepest branches (panels IV/V/VI) don't fit
+  // dimensionally and a fit-refusal banner shows (see E2E-86) — but a fit failure
+  // never hides the tree (App.tsx renders the canvas regardless), so the panels'
+  // structural DOM contract this test checks is unaffected by that refusal.
+  await page.goto(viewUrl(WORST, 'arr:panels', 'Worst'));
+  await expect(page.locator('svg.print-canvas-svg[data-arrangement="panels"]')).toBeVisible();
+  await expect(page.locator('g.print-panel').first()).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+
+  const report = await page.evaluate(() => {
+    const panels = Array.from(document.querySelectorAll('g.print-panel'));
+    const out: string[] = [];
+    const inn: string[] = [];
+    const seenIn = new Map<string, string[]>(); // personId → "panelLabel:generation"
+    let masterMaxGen = -1;
+    for (const p of panels) {
+      const label = p.getAttribute('data-panel-label') ?? '?';
+      for (const m of Array.from(p.querySelectorAll('g.print-marker'))) {
+        (m.getAttribute('data-marker-side') === 'in' ? inn : out).push(m.getAttribute('data-marker') ?? '?');
+      }
+      for (const n of Array.from(p.querySelectorAll('g.person-node'))) {
+        const id = n.getAttribute('data-person-id') ?? '?';
+        seenIn.set(id, [...(seenIn.get(id) ?? []), `${label}:${n.getAttribute('data-generation')}`]);
+        if (label === 'master') masterMaxGen = Math.max(masterMaxGen, Number(n.getAttribute('data-generation')));
+      }
+    }
+    return {
+      panelCount: panels.length,
+      out: [...out].sort(),
+      inn: [...inn].sort(),
+      dups: [...seenIn.entries()].filter(([, v]) => v.length > 1),
+      masterMaxGen,
+      personIdsInChips: out.concat(inn).filter((l) => /\br\d+p?\b/.test(l)),
+    };
+  });
+  // Empirically verified against the current partitioner: worst-200 decomposes into
+  // 8 panels (master + I..VII), well above the >=3 structural floor this asserts.
+  expect(report.panelCount).toBeGreaterThanOrEqual(3);
+  expect(report.out).toEqual(report.inn);                     // symmetric difference of marker labels = ∅
+  expect(new Set(report.inn).size).toBe(report.inn.length);   // one in-chip per panel, no dup labels
+  // Verified empirically: worst-200's master panel tops out at generation 1 (well
+  // inside F0–F2) — the tiny-branch fallback's known latent gen-3 overshoot (flagged
+  // in the Task 3 report) doesn't trigger on this fixture's master, so this bound is safe here.
+  expect(report.masterMaxGen).toBeLessThanOrEqual(2);
+  expect(report.personIdsInChips).toEqual([]);                // markers are Roman labels, never row ids
+  for (const [id, at] of report.dups) {
+    // D4 echo contract: a duplicate appears exactly twice, once as a sub-panel's root couple
+    expect(at.length, `${id} appears in ${at.join(', ')}`).toBe(2);
+    expect(at.some((a) => a.endsWith(':0') && !a.startsWith('master:')), `${id} echo must root a sub-panel`).toBe(true);
+  }
+  expect(errors).toEqual([]);
+});
+
+for (const arr of ['flow', 'fan', 'panels'] as const) {
   test(`E2E-81: pan/zoom/expand interactions match the Top-down arrangement — ${arr} (UC-78)`, async ({ page }) => {
     await page.goto(viewUrl(STANDARD, `arr:${arr}`, 'Std'));
     await expect(page.locator('g.person-node').first()).toBeVisible();

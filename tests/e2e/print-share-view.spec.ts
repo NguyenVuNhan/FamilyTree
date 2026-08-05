@@ -102,3 +102,17 @@ test('E2E-78: registry entries never carry ?view=, and the demo family accepts a
   expect(capsuleFill).toBe('rgb(247, 243, 232)'); // botanical's nodeFill #F7F3E8
   expect(new URL(page.url()).search).toBe('?family=demo'); // canonical, view stripped
 });
+
+test('E2E-90: fmt:trip is panels-only — any other arrangement degrades it to the default format silently (UC-80, UC-92)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(`${treeUrl(SRC_URL, 'Std')}&view=${encodeURIComponent('arr:flow,fmt:trip')}`);
+  await expect(page.locator('g.person-node').first()).toBeVisible(); // flow renders — never an error panel
+  await page.getByRole('button', { name: 'Layout settings' }).click();
+  const fmtGroup = page.getByRole('group', { name: 'Format' });
+  await expect(fmtGroup.getByRole('button', { name: 'Panorama' })).toHaveAttribute('aria-pressed', 'true'); // trip fell back per-field
+  await expect(fmtGroup.getByRole('button', { name: 'Triptych' })).toHaveCount(0); // the option only exists on Panels
+  await page.getByRole('group', { name: 'Arrangement' }).getByRole('button', { name: 'Panels' }).click();
+  await expect(fmtGroup.getByRole('button', { name: 'Triptych' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
