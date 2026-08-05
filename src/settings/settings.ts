@@ -4,7 +4,7 @@ import { PRINT_BOUNDS } from '../print/formats';
 import type { ThemeId } from '../print/themes';
 
 export type CardStyle = 'classic' | 'circle' | 'photoLeft' | 'archCard';
-export type Arrangement = 'topDown' | 'flow' | 'fan'; // PR ③ adds 'panels', PR ④ 'stacks'
+export type Arrangement = 'topDown' | 'flow' | 'fan' | 'panels'; // PR ④ adds 'stacks'
 export type ContentMode = 'full' | 'name' | 'avatar';
 export type NamePosition = 'top' | 'bottom';
 export type ConnectorStyle = 'elbow' | 'curved' | 'straight';
@@ -60,9 +60,9 @@ const CONTENT_MODES: readonly ContentMode[] = ['full', 'name', 'avatar'];
 const NAME_POSITIONS: readonly NamePosition[] = ['top', 'bottom'];
 const CONNECTOR_STYLES: readonly ConnectorStyle[] = ['elbow', 'curved', 'straight'];
 const PLACEHOLDER_STYLES: readonly PlaceholderStyle[] = ['initials', 'illustrated'];
-const ARRANGEMENTS: readonly Arrangement[] = ['topDown', 'flow', 'fan'];
+const ARRANGEMENTS: readonly Arrangement[] = ['topDown', 'flow', 'fan', 'panels'];
 const THEME_IDS: readonly ThemeId[] = ['indochine', 'nordic', 'inkwash', 'botanical'];
-const FORMAT_IDS: readonly FormatId[] = ['a4', 'a3', 'a1', 'a0', 'pano', 'square', 'custom'];
+const FORMAT_IDS: readonly FormatId[] = ['a4', 'a3', 'a1', 'a0', 'pano', 'square', 'trip', 'custom'];
 
 function pick<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
@@ -76,7 +76,7 @@ function num(value: unknown, bounds: { min: number; max: number }, fallback: num
 /** Per-field validation: any unknown value or out-of-range number falls back to that field's default. */
 export function sanitizeSettings(raw: unknown): LayoutSettings {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  return {
+  const s: LayoutSettings = {
     cardStyle: pick(r.cardStyle, CARD_STYLES, DEFAULT_SETTINGS.cardStyle),
     contentMode: pick(r.contentMode, CONTENT_MODES, DEFAULT_SETTINGS.contentMode),
     namePosition: pick(r.namePosition, NAME_POSITIONS, DEFAULT_SETTINGS.namePosition),
@@ -94,6 +94,11 @@ export function sanitizeSettings(raw: unknown): LayoutSettings {
     marginMm: num(r.marginMm, PRINT_BOUNDS.marginMm, DEFAULT_SETTINGS.marginMm),
     frameGuide: r.frameGuide === true,
   };
+  // Cross-field rule (spec Format presets: "triptych (only with panels)"): every
+  // settings path — storage, ?view= links, panel edits — degrades trip per-field
+  // to the default format instead of erroring; the arrangement is untouched.
+  if (s.format === 'trip' && s.arrangement !== 'panels') s.format = DEFAULT_SETTINGS.format;
+  return s;
 }
 
 /** Print controls (theme/format/margin/guide/export) are live outside topDown;

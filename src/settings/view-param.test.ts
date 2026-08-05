@@ -72,3 +72,15 @@ describe('arr:fan (PR ②)', () => {
     });
   });
 });
+
+describe('arr:panels + fmt:trip (PR ③)', () => {
+  it('round-trips panels with trip', () => {
+    const s = { ...DEFAULT_SETTINGS, arrangement: 'panels' as const, format: 'trip' as const };
+    expect(encodeView(s)).toBe('arr:panels,fmt:trip');
+    expect(decodeView('arr:panels,fmt:trip')).toEqual(s);
+  });
+  it('fmt:trip without arr:panels degrades to the default format, silently', () => {
+    expect(decodeView('arr:flow,fmt:trip')).toMatchObject({ arrangement: 'flow', format: DEFAULT_SETTINGS.format });
+    expect(decodeView('fmt:trip')).toMatchObject({ arrangement: 'topDown', format: DEFAULT_SETTINGS.format });
+  });
+});

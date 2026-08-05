@@ -7,10 +7,11 @@ const CONTENT_MODES = [['full', 'Full'], ['name', 'Name'], ['avatar', 'Avatar']]
 const NAME_POSITIONS = [['top', 'Top'], ['bottom', 'Bottom']] as const;
 const PLACEHOLDERS = [['initials', 'Initials'], ['illustrated', 'Illustrated']] as const;
 const CONNECTORS = [['elbow', 'Elbow'], ['curved', 'Curved'], ['straight', 'Straight']] as const;
-const ARRANGEMENTS = [['topDown', 'Top-down'], ['flow', 'Scroll'], ['fan', 'Fan']] as const;
+const ARRANGEMENTS = [['topDown', 'Top-down'], ['flow', 'Scroll'], ['fan', 'Fan'], ['panels', 'Panels']] as const;
 const THEME_OPTIONS = [['indochine', 'Indochine'], ['nordic', 'Nordic'], ['inkwash', 'Ink wash'], ['botanical', 'Botanical']] as const;
 const FORMAT_OPTIONS = [
-  ['a4', 'A4'], ['a3', 'A3'], ['a1', 'A1'], ['a0', 'A0'], ['pano', 'Panorama'], ['square', 'Square'], ['custom', 'Custom'],
+  ['a4', 'A4'], ['a3', 'A3'], ['a1', 'A1'], ['a0', 'A0'], ['pano', 'Panorama'], ['square', 'Square'],
+  ['trip', 'Triptych'], ['custom', 'Custom'],
 ] as const;
 
 const CARD_DISABLED_REASON = 'Applies to the Top-down arrangement';
@@ -101,13 +102,25 @@ export function SettingsPanel({ settings, onChange }: {
         ? 'A fan reads best on a wide landscape format — 2:1 or wider'
         : null;
 
+  // Triptych exists only for panels (D6) — hide it elsewhere so there is no dead control.
+  const formatOptions = settings.arrangement === 'panels'
+    ? FORMAT_OPTIONS
+    : FORMAT_OPTIONS.filter(([v]) => v !== 'trip');
+
   return (
     <div className="settings-panel" data-testid="settings-panel" role="dialog" aria-label="Layout settings">
-      <Segmented label="Arrangement" value={settings.arrangement} options={ARRANGEMENTS} onSelect={(v) => set('arrangement', v)} />
+      <Segmented label="Arrangement" value={settings.arrangement} options={ARRANGEMENTS}
+        onSelect={(v) => onChange({
+          ...settings,
+          arrangement: v,
+          // leaving panels with trip selected: reset in the SAME change so the
+          // stored settings never hold an invalid combination (D7)
+          ...(settings.format === 'trip' && v !== 'panels' ? { format: DEFAULT_SETTINGS.format } : {}),
+        })} />
       {printActive && (
         <>
           <Segmented label="Theme" value={settings.theme} options={THEME_OPTIONS} onSelect={(v) => set('theme', v)} />
-          <Segmented label="Format" value={settings.format} options={FORMAT_OPTIONS} onSelect={(v) => set('format', v)} />
+          <Segmented label="Format" value={settings.format} options={formatOptions} onSelect={(v) => set('format', v)} />
           {settings.format === 'custom' && <CustomSizeRow settings={settings} onChange={onChange} />}
           {aspectHint && (
             <p className="settings-hint" data-testid="aspect-hint">{aspectHint}</p>
