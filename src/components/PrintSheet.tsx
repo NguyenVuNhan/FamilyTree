@@ -29,7 +29,7 @@ export function PrintSheet({ svgSelector, wMm, hMm, background, panelLabels }: {
         style.id = 'print-page';
         document.head.appendChild(style);
       }
-      style.textContent = `@media print { @page { size: ${wMm}mm ${hMm}mm; margin: 0 } .print-sheet svg { width: ${wMm}mm; height: ${hMm}mm; } .print-sheet-page { break-after: page; } }`;
+      style.textContent = `@media print { @page { size: ${wMm}mm ${hMm}mm; margin: 0 } .print-sheet svg { width: ${wMm}mm; height: ${hMm}mm; display: block; } .print-sheet-page:not(:last-child) { break-after: page; } }`;
     };
     window.addEventListener('beforeprint', compose);
     // The injected @page rule must not outlive this component: if the user switches
