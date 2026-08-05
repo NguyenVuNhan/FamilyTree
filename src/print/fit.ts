@@ -35,11 +35,17 @@ export function checkFit(
  *  {label, headName, wMm, hMm}, which can't see PrintPanel's required `overCap`
  *  flag (src/layout/panels-layout.ts — carried from PanelPlan.overCap, set when
  *  a branch bottomed out at F0–F1 narrowing and still exceeds PANEL_SOFT_CAP).
- *  Widened here to consume it: an over-cap panel refuses honestly (the branch
- *  could not be subdivided further and exceeds this panel's capacity) instead
- *  of silently emitting an unbounded panel, in addition to the dimensional
- *  refusal below. Checked ahead of the dimensional check per panel, since an
- *  over-cap branch may still happen to satisfy the mm arithmetic. */
+ *  Widened here to consume it.
+ *
+ *  ADJUDICATED SEMANTICS (fix round 2, replaces the fit1 round's overCap-first
+ *  gate): the dimensional check is the ONLY gate. A panel that fits at this
+ *  format is never refused for being overCap — real worst-case fixtures
+ *  legitimately bottom out at overCap while still fitting a large-enough
+ *  format (e.g. A0), and PR ③'s core promise is that such trees export via
+ *  Panels. overCap is now an ANNOTATION applied only when the dimensional
+ *  check already failed: it explains *why* growing the format alone won't
+ *  necessarily be enough (the branch couldn't be subdivided further) and
+ *  points at restructuring as an alternative to just picking a bigger format. */
 export function checkPanelsFit(
   comp: { panels: { label: string | null; headName: string | null; wMm: number; hMm: number; overCap: boolean }[] },
   size: { wMm: number; hMm: number }, marginMm: number, format: FormatId,
@@ -51,18 +57,14 @@ export function checkPanelsFit(
     };
   }
   for (const p of comp.panels) {
-    const who = p.label ? `Panel ${p.label} (${p.headName ?? ''})` : 'The master panel';
-    if (p.overCap) {
-      return {
-        ok: false, requiredWmm: p.wMm, requiredHmm: p.hMm,
-        message: `${who} could not be subdivided further and exceeds this panel's capacity — choose a larger per-panel format, or restructure the tree (exclude branches, or split the family earlier).`,
-      };
-    }
     const f = checkFit(p.wMm, p.hMm, size, marginMm);
     if (!f.ok) {
+      const who = p.label ? `Panel ${p.label} (${p.headName ?? ''})` : 'The master panel';
       return {
         ...f,
-        message: `${who} needs at least ${cm(f.requiredWmm)}×${cm(f.requiredHmm)} cm at this text size — choose a larger format or custom size.`,
+        message: p.overCap
+          ? `${who} needs at least ${cm(f.requiredWmm)}×${cm(f.requiredHmm)} cm at this text size and could not be subdivided further — choose a larger per-panel format, or restructure the tree.`
+          : `${who} needs at least ${cm(f.requiredWmm)}×${cm(f.requiredHmm)} cm at this text size — choose a larger format or custom size.`,
       };
     }
   }
