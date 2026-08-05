@@ -1,10 +1,7 @@
 import type { PrintScene } from '../layout/flow-layout';
-import { yearFontMm } from '../layout/flow-layout';
 import { TITLE_BLOCK_MM } from '../print/fit';
 import { themeCss, type ThemeTokens } from '../print/themes';
-
-const PAD_X = 4;
-const PAD_Y = 2.5;
+import { PrintSceneGroup } from './PrintSceneGroup';
 
 export function PrintTreeCanvas({ scene, theme, title, guide, expandedId, onToggle, arrangement = 'flow' }: {
   scene: PrintScene; theme: ThemeTokens; title: string;
@@ -39,28 +36,7 @@ export function PrintTreeCanvas({ scene, theme, title, guide, expandedId, onTogg
           );
         })()}
         <g transform={`translate(0 ${contentY})`}>
-          {scene.edges.map((e, i) => (
-            <path key={i} className="connector" data-from={e.fromId} data-to={e.toId} d={e.d} />
-          ))}
-          {scene.nodes.map((n) => (
-            <g key={n.personId} className="person-node" role="button" tabIndex={0}
-              aria-label={n.nameLines.join(' ')}
-              data-person-id={n.personId} data-generation={n.generation}
-              transform={`translate(${n.xMm} ${n.yMm})${n.rotateDeg ? ` rotate(${n.rotateDeg})` : ''}`}
-              onClick={() => onToggle(n.personId)}
-              onKeyDown={(e) => { if (e.key === 'Enter') onToggle(n.personId); }}>
-              <rect className="pn-capsule" width={n.wMm} height={n.hMm} rx={Math.min(n.hMm / 2, 6)}
-                strokeWidth={n.generation <= 1 ? 0.6 : 0.35} />
-              {n.nameLines.map((line, i) => (
-                <text key={i} className={n.titleFace ? 'pn-name-title' : 'pn-name'} fontSize={n.fontMm}
-                  x={PAD_X} y={PAD_Y + (i + 0.8) * 1.4 * n.fontMm}>{line}</text>
-              ))}
-              {n.years && (
-                <text className="pn-years" fontSize={yearFontMm(n.fontMm)}
-                  x={PAD_X} y={PAD_Y + (n.nameLines.length + 0.7) * 1.4 * n.fontMm}>{n.years}</text>
-              )}
-            </g>
-          ))}
+          <PrintSceneGroup scene={scene} onToggle={onToggle} />
         </g>
       </svg>
       {expanded && (
