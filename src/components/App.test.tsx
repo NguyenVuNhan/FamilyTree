@@ -320,3 +320,84 @@ describe('fan arrangement (UC-77, PR ②)', () => {
     expect(screen.getByRole('button', { name: 'Export SVG' })).toBeDisabled();
   });
 });
+
+describe('panels arrangement (UC-77/85/89, PR ③)', () => {
+  const csvFetch = (csv: string) => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => csv }) as Response));
+  // root couple → child couple → grandchild couple with 5 married great-grandchildren:
+  // the grandchild union subtree is 12 people ≥ MAJOR_BRANCH_MIN on the master's F2 frontier → 2 panels.
+  const DEEP_CSV = [
+    'Image,Gen 1,Gen 2,Gen 3,Gen 4',
+    ',Ông Tổ + Bà Tổ,,,',
+    ',,Con Cả + Vợ Cả,,',
+    ',,,Cháu Đích + Vợ Đích,',
+    ',,,,Chắt Một + Dâu Một',
+    ',,,,Chắt Hai + Dâu Hai',
+    ',,,,Chắt Ba + Dâu Ba',
+    ',,,,Chắt Bốn + Dâu Bốn',
+    ',,,,Chắt Năm + Dâu Năm',
+  ].join('\n');
+
+  it('renders master + sub-panel through the one SVG path: dataset, panels markup, sheet, export enabled', async () => {
+    csvFetch(DEEP_CSV);
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:panels')}`);
+    render(<App />);
+    expect((await screen.findAllByRole('button', { name: /Ông Tổ/ })).length).toBeGreaterThan(0);
+    expect(document.body.dataset.printArrangement).toBe('panels');
+    const svg = document.querySelector('svg.print-canvas-svg')!;
+    expect(svg.getAttribute('data-arrangement')).toBe('panels');
+    expect(document.querySelectorAll('g.print-panel')).toHaveLength(2);
+    // paired markers: one out-chip in the master, one in-chip in panel I
+    expect(document.querySelector('g.print-marker[data-marker-side="out"]')!.getAttribute('data-marker')).toBe('I');
+    expect(document.querySelector('g.print-marker[data-marker-side="in"]')!.getAttribute('data-marker')).toBe('I');
+    expect(screen.getByTestId('print-sheet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export SVG' })).toBeEnabled();
+  });
+
+  it('BLANK-PAGE REGRESSION (PR ② review carry-forward): every print arrangement mounts the print canvas AND the print sheet together; topDown mounts neither', async () => {
+    for (const arr of ['flow', 'fan', 'panels'] as const) {
+      csvFetch(DEEP_CSV);
+      setUrl(`${SRC_SEARCH}&view=${encodeURIComponent(`arr:${arr}`)}`);
+      const { unmount } = render(<App />);
+      await screen.findAllByRole('button', { name: /Ông Tổ/ });
+      // the print CSS hides everything but .print-sheet whenever the body dataset is
+      // set — so the dataset, the sheet, and the canvas SVG must always co-exist
+      expect(document.body.dataset.printArrangement, arr).toBe(arr);
+      expect(document.querySelector('svg.print-canvas-svg'), arr).not.toBeNull();
+      expect(screen.getByTestId('print-sheet'), arr).toBeInTheDocument();
+      unmount();
+      vi.unstubAllGlobals();
+    }
+    // Loop iterations above share this source's settingsKey (same src=), so a
+    // saved-settings entry from the last ?view= (panels) leaks in via loadSettings
+    // unless cleared — this final render must see genuinely default settings.
+    localStorage.clear();
+    csvFetch(DEEP_CSV);
+    setUrl(SRC_SEARCH); // topDown default
+    render(<App />);
+    await screen.findAllByRole('button', { name: /Ông Tổ/ });
+    expect(document.body.dataset.printArrangement).toBeUndefined();
+    expect(document.querySelector('svg.print-canvas-svg')).toBeNull();
+    expect(screen.queryByTestId('print-sheet')).toBeNull();
+  });
+
+  it('per-panel fit refusal names the offending panel by head display name (a4 is too small)', async () => {
+    csvFetch(DEEP_CSV);
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:panels,fmt:a4')}`);
+    render(<App />);
+    const refusal = await screen.findByTestId('fit-refusal');
+    // jsdom's canvas-less measurer (8px/char fallback) makes panel I far exceed A4 at a 60mm margin
+    expect(refusal.textContent).toMatch(/Panel I \(Cháu Đích\)|The master panel/);
+    expect(refusal.textContent).not.toMatch(/\br\d+p?\b/);
+    expect(screen.getByRole('button', { name: 'Export SVG' })).toBeDisabled();
+  });
+
+  it('triptych refuses when the family does not split into exactly 3 panels', async () => {
+    csvFetch('Image,Gen 1,Gen 2\n,Ông + Bà,\n,,Con Một\n,,Con Hai');
+    setUrl(`${SRC_SEARCH}&view=${encodeURIComponent('arr:panels,fmt:trip')}`);
+    render(<App />);
+    const refusal = await screen.findByTestId('fit-refusal');
+    expect(refusal.textContent).toContain('triptych');
+    expect(refusal.textContent).toContain('1'); // this family is a single master panel
+    expect(screen.getByRole('button', { name: 'Export SVG' })).toBeDisabled();
+  });
+});
